@@ -7,17 +7,17 @@ function veh = load_vehicle_params(accel_map_file, brake_map_file)
 
     veh.lf = 1.2140;
     veh.lr = veh.L - veh.lf;
-    veh.Iz = 3712;
+    veh.Iz = 2500;
 
     % Simplified Magic Formula tire parameters.
     % Fy = D * sin(C * atan(B * alpha))
     veh.tire.front.B = 9.5;
     veh.tire.front.C = 1.30;
-    veh.tire.front.D = 9000;
+    veh.tire.front.D = 8000;
 
     veh.tire.rear.B = 10.5;
     veh.tire.rear.C = 1.30;
-    veh.tire.rear.D = 9500;
+    veh.tire.rear.D = 8500;
 
     % Linearized cornering stiffness around small slip angles.
     veh.tire.front.Calpha = veh.tire.front.B * veh.tire.front.C * veh.tire.front.D;
