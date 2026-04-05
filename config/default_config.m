@@ -12,7 +12,7 @@ function cfg = default_config()
     cfg.vehicle.accel_map_file = fullfile('data', 'Acc_mapData_noSlope.mat');
     cfg.vehicle.brake_map_file = fullfile('data', 'brake_mapData_noSlope.mat');
     cfg.vehicle.max_steer = deg2rad(35);
-    cfg.vehicle.max_steer_rate = deg2rad(70);
+    cfg.vehicle.max_steer_rate = deg2rad(40);
     cfg.vehicle.delay.steer_s = 0.1;
     cfg.vehicle.delay.longitudinal_s = 0.1;
 
