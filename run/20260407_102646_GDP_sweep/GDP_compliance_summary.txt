@@ -1,0 +1,64 @@
+================================================================
+  GDP BRIEF COMPLIANCE SUMMARY (CORRECTED METRICS)
+  Generated: 07-Apr-2026 10:28:27
+================================================================
+
+METRIC DEFINITIONS:
+  Lateral deviation  = peak cross-track error (perpendicular to path)
+  Longitudinal deviation = peak along-path position error
+    Computed as: max(abs(cumsum((v_ref - v_actual) * dt)))
+    i.e. how many METRES ahead/behind the vehicle is
+
+THRESHOLDS (GDP Brief REQ-1, slide 13):
+  Lateral:      < 0.6 m
+  Longitudinal: < 0.8 m
+
+REQ-2: dt = 0.050 s => 20 Hz (req >= 10 Hz): PASS
+REQ-3: Steer delay=0.1s, Lon delay=0.1s, 3DOF+MF: PASS
+
+Combo                Scenario Speed  PeakCTE(m) LatOK    PkLonDev(m)  LonOK    Overall 
+-----------------------------------------------------------------------------------------------
+stanley+pid          GDP-S1   0.5    197.9077   FAIL     2.3531       FAIL     FAIL    
+stanley+pid          GDP-S2   2.0    409.7072   FAIL     1.1964       FAIL     FAIL    
+stanley+pid          GDP-S3   3.0    266.7338   FAIL     2.0693       FAIL     FAIL    
+stanley+pid          GDP-S3   4.0    266.0966   FAIL     2.9430       FAIL     FAIL    
+stanley+pid          GDP-S3   5.0    261.5646   FAIL     3.6068       FAIL     FAIL    
+stanley+pid          GDP-S3   7.0    360.4467   FAIL     4.4750       FAIL     FAIL    
+stanley+pid          GDP-S3-EXT 10.0   1222.9760  FAIL     23.5029      FAIL     FAIL    
+stanley+lqr          GDP-S1   0.5    197.4794   FAIL     0.5725       PASS     FAIL    
+stanley+lqr          GDP-S2   2.0    405.6672   FAIL     0.7383       PASS     FAIL    
+stanley+lqr          GDP-S3   3.0    266.4050   FAIL     1.8199       FAIL     FAIL    
+stanley+lqr          GDP-S3   4.0    266.9520   FAIL     2.8051       FAIL     FAIL    
+stanley+lqr          GDP-S3   5.0    262.3484   FAIL     3.5346       FAIL     FAIL    
+stanley+lqr          GDP-S3   7.0    361.9159   FAIL     4.4413       FAIL     FAIL    
+stanley+lqr          GDP-S3-EXT 10.0   1222.7657  FAIL     23.5029      FAIL     FAIL    
+pure_pursuit+pid     GDP-S1   0.5    27.1434    FAIL     2.3797       FAIL     FAIL    
+pure_pursuit+pid     GDP-S2   2.0    2.0227     FAIL     1.1979       FAIL     FAIL    
+pure_pursuit+pid     GDP-S3   3.0    1.3017     FAIL     2.0712       FAIL     FAIL    
+pure_pursuit+pid     GDP-S3   4.0    2.0282     FAIL     2.9500       FAIL     FAIL    
+pure_pursuit+pid     GDP-S3   5.0    2.0134     FAIL     3.6139       FAIL     FAIL    
+pure_pursuit+pid     GDP-S3   7.0    2.4948     FAIL     4.4757       FAIL     FAIL    
+pure_pursuit+pid     GDP-S3-EXT 10.0   4.6667     FAIL     23.5221      FAIL     FAIL    
+pure_pursuit+lqr     GDP-S1   0.5    26.8821    FAIL     0.5696       PASS     FAIL    
+pure_pursuit+lqr     GDP-S2   2.0    2.0159     FAIL     0.7375       PASS     FAIL    
+pure_pursuit+lqr     GDP-S3   3.0    1.2889     FAIL     1.8206       FAIL     FAIL    
+pure_pursuit+lqr     GDP-S3   4.0    2.0314     FAIL     2.8079       FAIL     FAIL    
+pure_pursuit+lqr     GDP-S3   5.0    2.0388     FAIL     3.5398       FAIL     FAIL    
+pure_pursuit+lqr     GDP-S3   7.0    2.5050     FAIL     4.4396       FAIL     FAIL    
+pure_pursuit+lqr     GDP-S3-EXT 10.0   4.9262     FAIL     23.5221      FAIL     FAIL    
+mpc+pid              GDP-S1   0.5    0.3084     PASS     0.9073       FAIL     FAIL    
+mpc+pid              GDP-S2   2.0    0.2068     PASS     1.1961       FAIL     FAIL    
+mpc+pid              GDP-S3   3.0    0.1339     PASS     2.0654       FAIL     FAIL    
+mpc+pid              GDP-S3   4.0    0.2071     PASS     2.9477       FAIL     FAIL    
+mpc+pid              GDP-S3   5.0    0.2060     PASS     3.6090       FAIL     FAIL    
+mpc+pid              GDP-S3   7.0    0.2799     PASS     4.4754       FAIL     FAIL    
+mpc+pid              GDP-S3-EXT 10.0   26.3941    FAIL     23.5032      FAIL     FAIL    
+mpc+lqr              GDP-S1   0.5    0.3069     PASS     0.2466       PASS     PASS    
+mpc+lqr              GDP-S2   2.0    0.2053     PASS     0.7396       PASS     PASS    
+mpc+lqr              GDP-S3   3.0    0.1099     PASS     1.8216       FAIL     FAIL    
+mpc+lqr              GDP-S3   4.0    0.2069     PASS     2.8063       FAIL     FAIL    
+mpc+lqr              GDP-S3   5.0    0.2041     PASS     3.5356       FAIL     FAIL    
+mpc+lqr              GDP-S3   7.0    0.2762     PASS     4.4421       FAIL     FAIL    
+mpc+lqr              GDP-S3-EXT 10.0   24.5438    FAIL     23.5032      FAIL     FAIL    
+
+OVERALL: 2 / 42 test cases passed (5%)

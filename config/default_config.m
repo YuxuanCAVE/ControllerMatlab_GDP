@@ -12,7 +12,7 @@ function cfg = default_config()
     cfg.vehicle.accel_map_file = fullfile('data', 'Acc_mapData_noSlope.mat');
     cfg.vehicle.brake_map_file = fullfile('data', 'brake_mapData_noSlope.mat');
     cfg.vehicle.max_steer = deg2rad(35);
-    cfg.vehicle.max_steer_rate = deg2rad(70);
+    cfg.vehicle.max_steer_rate = deg2rad(40);
     cfg.vehicle.delay.steer_s = 0.1;
     cfg.vehicle.delay.longitudinal_s = 0.1;
 
@@ -39,9 +39,9 @@ function cfg = default_config()
     cfg.mpc.kappa_ff_gain = 0.5;
     cfg.mpc.max_steer = cfg.vehicle.max_steer;
 
-    cfg.lon_pid.kp = 0.8;
-    cfg.lon_pid.ki = 0.30;
-    cfg.lon_pid.kd = 0.02;
+    cfg.lon_pid.kp = 2.5;
+    cfg.lon_pid.ki = 2.0;
+    cfg.lon_pid.kd = 0.08;
     cfg.lon_pid.a_min = -3.0;
     cfg.lon_pid.a_max = 2.0;
     cfg.lon_pid.i_term = 0;
@@ -52,8 +52,8 @@ function cfg = default_config()
     % Error-state augmentation:
     %   e_v(k+1) = e_v(k) - dt * a_des(k)
     %   z(k+1)   = z(k) + dt * e_v(k)
-    cfg.lon_lqr.Q = diag([8.0, 1.5]);   % [speed_error, integrated_speed_error]
-    cfg.lon_lqr.R = 0.8;                % acceleration effort penalty
+    cfg.lon_lqr.Q = diag([20, 10]);   % [speed_error, integrated_speed_error]
+    cfg.lon_lqr.R = 0.4;                % acceleration effort penalty
     cfg.lon_lqr.a_min = -3.0;
     cfg.lon_lqr.a_max = 2.0;
     cfg.lon_lqr.int_error = 0.0;
