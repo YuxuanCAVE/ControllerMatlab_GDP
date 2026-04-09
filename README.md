@@ -1,4 +1,11 @@
+<<<<<<< HEAD
 # ControllerMatlab — Kia Niro Path-Tracking Controller Framework
+=======
+# ROS2 Node
+You can find here https://github.com/YuxuanCAVE/vehicle_controller
+
+# ControllerMatlab
+>>>>>>> 4c7c847ed59c18e67016c0cec229ec8640e3f630
 
 MATLAB closed-loop path-following framework for the Cranfield Kia Niro automated vehicle platform (GDP 2026).
 
