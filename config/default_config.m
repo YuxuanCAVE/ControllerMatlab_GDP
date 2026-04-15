@@ -1,11 +1,11 @@
 function cfg = default_config()
-    cfg.controller.lateral = "mpc_combined";  % "stanley" | "pure_pursuit" | "mpc" | "mpc_combined"
+    cfg.controller.lateral = "mpc_kinematic";  % "stanley" | "pure_pursuit" | "mpc" | "mpc_kinematic" | "mpc_combined"
     cfg.controller.longitudinal = "lqr";      % "pid" | "lqr" (ignored when lateral = "mpc_combined")
 
     cfg.sim.dt = 0.05;
     cfg.sim.T_end = 150;
     cfg.sim.max_travel_time = cfg.sim.T_end;
-    cfg.sim.progress_window = 80;
+    cfg.sim.progress_window = 5;
 
     cfg.ref.path_file = fullfile('data', 'path_ref.mat');
 
@@ -20,7 +20,7 @@ function cfg = default_config()
     % To use constant speed: set mode = "constant" and constant_value
     % To use speed profile:  set mode = "profile" and profile_file
     cfg.speed.mode = "constant";   % "constant" | "profile"
-    cfg.speed.constant_value = 10;  % used when mode = "constant" (m/s)
+    cfg.speed.constant_value = 3;  % used when mode = "constant" (m/s)
     cfg.speed.profile_file = fullfile( ...
         'data', 'reference_velocity', 'referencePath_Velocity_peak_velocity_5.mat');
     % Available profiles: peak_velocity_3, 4, 5, 7 .mat
@@ -54,6 +54,16 @@ function cfg = default_config()
     cfg.mpc.kappa_ff_gain = 0.5;
     cfg.mpc.max_steer = cfg.vehicle.max_steer;
 
+    % Kinematic bicycle MPC lateral only
+    cfg.mpc_kinematic.N = 25;
+    cfg.mpc_kinematic.Q = diag([18, 14]);
+    cfg.mpc_kinematic.R = 4;
+    cfg.mpc_kinematic.Rd = 12.0;
+    cfg.mpc_kinematic.kappa_ff_gain = 1.0;
+    cfg.mpc_kinematic.max_steer = cfg.vehicle.max_steer;
+    cfg.mpc_kinematic.fallback_k_e_y = 0.9;
+    cfg.mpc_kinematic.fallback_k_e_psi = 1.4;
+
     % ── Combined MPC (lateral + longitudinal) ─────────────────────────
     % Runs at 10 Hz (drive-by-wire limit)
     % State: [ey, epsi, vy, r, ev, z_lon]  (6 states)
@@ -83,9 +93,19 @@ function cfg = default_config()
     cfg.lon_lqr.a_min = cfg.accel_limits.a_min;
     cfg.lon_lqr.a_max = cfg.accel_limits.a_max;
     cfg.lon_lqr.int_error = 0.0;
+    cfg.lon_lqr.prev_a_des = 0.0;
+    cfg.lon_lqr.drive_mode = "coast";
+    cfg.lon_lqr.ev_gate = 0.05;
+    cfg.lon_lqr.a_gate = 0.12;
+    cfg.lon_lqr.a_deadband = 0.005;
+    cfg.lon_lqr.a_hyst_enter_drive = 0.02;
+    cfg.lon_lqr.a_hyst_exit_drive = 0.008;
+    cfg.lon_lqr.a_hyst_enter_brake = 0.025;
+    cfg.lon_lqr.a_hyst_exit_brake = 0.01;
+    cfg.lon_lqr.cmd_lowpass_tau_s = 0.0;
+    cfg.lon_lqr.a_rate_up_max = 100.0;
+    cfg.lon_lqr.a_rate_down_max = 100.0;
 
     % ── Run settings ──────────────────────────────────────────────────
     cfg.run.root_dir = 'run';
-    cfg.run.compare_longitudinal = false;  % true to compare PID vs LQR
-    cfg.run.longitudinal_compare_set = ["pid", "lqr"];
 end

@@ -1,0 +1,6 @@
+# ROS2 bag raw data
+kianirobag/
+rosbag2_*/
+*.db3
+*.sqlite3
+

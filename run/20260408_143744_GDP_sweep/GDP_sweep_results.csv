@@ -1,8 +1,0 @@
-Controller,Longitudinal,GDP_Scenario,Peak_Speed_mps,Speed_Mode,RMS_CTE_m,Peak_CTE_m,RMS_Heading_Err_deg,RMS_Speed_Err_mps,Peak_Speed_Err_mps,Peak_Lon_Dev_m,RMS_Lon_Dev_m,Loop_Time_s,Goal_Reached,Termination,REQ1_Lat_Pass,REQ1_Lon_Pass,Overall_Pass
-mpc_combined,none,GDP-S1,0.5,constant,0,0,0,0,0,0,0,0,,error: Unrecognized function or variable 'g_c_unit'.,ERROR,ERROR,ERROR
-mpc_combined,none,GDP-S2,2,constant,0,0,0,0,0,0,0,0,,error: Unrecognized function or variable 'g_c_unit'.,ERROR,ERROR,ERROR
-mpc_combined,none,GDP-S3,3,profile,0,0,0,0,0,0,0,0,,error: Unrecognized function or variable 'g_c_unit'.,ERROR,ERROR,ERROR
-mpc_combined,none,GDP-S3,4,profile,0,0,0,0,0,0,0,0,,error: Unrecognized function or variable 'g_c_unit'.,ERROR,ERROR,ERROR
-mpc_combined,none,GDP-S3,5,profile,0,0,0,0,0,0,0,0,,error: Unrecognized function or variable 'g_c_unit'.,ERROR,ERROR,ERROR
-mpc_combined,none,GDP-S3,7,profile,0,0,0,0,0,0,0,0,,error: Unrecognized function or variable 'g_c_unit'.,ERROR,ERROR,ERROR
-mpc_combined,none,GDP-S3-EXT,10,constant,0,0,0,0,0,0,0,0,,error: Unrecognized function or variable 'g_c_unit'.,ERROR,ERROR,ERROR

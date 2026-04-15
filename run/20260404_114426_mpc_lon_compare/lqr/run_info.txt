@@ -1,6 +1,0 @@
-Controller            : mpc + lqr
-Single loop time      : 95.850 s
-Max travel time       : 150.000 s
-Goal reached          : 1
-Timeout               : 0
-Termination reason    : goal_reached

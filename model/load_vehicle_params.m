@@ -25,9 +25,20 @@ function veh = load_vehicle_params(accel_map_file, brake_map_file)
 
     % ── Load actuator maps ────────────────────────────────────────────
     Sacc = load(accel_map_file);
-    acc_cmd = make_col(get_first_existing_field(Sacc, {'Acc_Full', 'Acc_full'}));
-    acc_force = make_col(get_first_existing_field(Sacc, {'Force_full', 'Force_Full'}));
+    acc_cmd_raw = make_col(get_first_existing_field(Sacc, {'Acc_Full', 'Acc_full'}));
+    acc_force_raw = make_col(get_first_existing_field(Sacc, {'Force_full', 'Force_Full'}));
+    acc_vel_raw = make_col(get_first_existing_field(Sacc, {'Vel_Full', 'Vel_full'}));
 
+    veh.acc.cmd_samples = acc_cmd_raw;
+    veh.acc.force_samples = acc_force_raw;
+    veh.acc.vel_samples = acc_vel_raw;
+    veh.acc.cmd_min = min(acc_cmd_raw);
+    veh.acc.cmd_max = max(acc_cmd_raw);
+    veh.acc.vel_min = min(acc_vel_raw);
+    veh.acc.vel_max = max(acc_vel_raw);
+
+    acc_cmd = acc_cmd_raw;
+    acc_force = acc_force_raw;
     [acc_cmd, ia] = unique(acc_cmd, 'stable');
     acc_force = acc_force(ia);
     [acc_force_sorted, i1] = sort(acc_force);
@@ -39,9 +50,19 @@ function veh = load_vehicle_params(accel_map_file, brake_map_file)
     Sbrk = load(brake_map_file);
     brk_cmd_raw = make_col(get_first_existing_field(Sbrk, {'Break_Full', 'Brake_Full', 'Brake_full'}));
     brk_force_raw = make_col(get_first_existing_field(Sbrk, {'Force_full', 'Force_Full'}));
+    brk_vel_raw = make_col(get_first_existing_field(Sbrk, {'Vel_Full', 'Vel_full'}));
 
     brk_cmd_mag = abs(brk_cmd_raw);
     brk_force_mag = abs(brk_force_raw);
+    brk_vel_mag = abs(brk_vel_raw);
+
+    veh.brk.cmd_samples = brk_cmd_mag;
+    veh.brk.force_samples = brk_force_mag;
+    veh.brk.vel_samples = brk_vel_mag;
+    veh.brk.cmd_min = min(brk_cmd_mag);
+    veh.brk.cmd_max = max(brk_cmd_mag);
+    veh.brk.vel_min = min(brk_vel_mag);
+    veh.brk.vel_max = max(brk_vel_mag);
 
     [brk_cmd_mag, ib] = unique(brk_cmd_mag, 'stable');
     brk_force_mag = brk_force_mag(ib);

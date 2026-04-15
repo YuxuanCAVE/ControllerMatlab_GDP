@@ -1,0 +1,25 @@
+Controller: MPC Dynamic + LQR
+
+LATERAL
+  RMS CTE            : 0.0816 m
+  Peak CTE           : 0.2756 m
+  RMS heading error  : 2.427 deg
+  REQ-1 lateral      : PASS
+
+LONGITUDINAL
+  RMS speed error    : 0.0906 m/s
+  Peak speed error   : 0.6305 m/s
+  Peak lon deviation : 0.3736 m
+  RMS lon deviation  : 0.0996 m
+  REQ-1 longit       : PASS
+
+TIMING
+  Control loop       : 0.050 s (20 Hz)
+  Mean exec time     : 0.001670 s
+  Max exec time      : 0.032288 s
+  Real-time OK       : YES
+
+GENERAL
+  Loop time          : 118.80 s
+  Goal reached       : 1
+  Termination        : goal_reached

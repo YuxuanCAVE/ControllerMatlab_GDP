@@ -1,8 +1,0 @@
-Controller,Longitudinal,GDP_Scenario,Peak_Speed_mps,Speed_Mode,RMS_CTE_m,Peak_CTE_m,RMS_Heading_Err_deg,RMS_Speed_Err_mps,Peak_Speed_Err_mps,Peak_Lon_Dev_m,RMS_Lon_Dev_m,Loop_Time_s,Goal_Reached,Termination,REQ1_Lat_Pass,REQ1_Lon_Pass,Overall_Pass
-mpc_combined,none,GDP-S1,0.5,constant,0.0799,0.2983,23.9799,0.072,0.0873,0.2795,0.269,400,false,max_travel_time,PASS,PASS,PASS
-mpc_combined,none,GDP-S2,2,constant,0.0734,0.289,1.997,0.0675,1.4929,0.5152,0.0996,177.75,true,goal_reached,PASS,PASS,PASS
-mpc_combined,none,GDP-S3,3,profile,0.0704,0.2333,6.4854,0.1154,2.4534,1.2009,0.1321,250,false,max_travel_time,PASS,FAIL,FAIL
-mpc_combined,none,GDP-S3,4,profile,0.1054,0.3244,2.2245,0.2004,2.9908,1.7418,0.202,142.1,true,goal_reached,PASS,FAIL,FAIL
-mpc_combined,none,GDP-S3,5,profile,0.0959,0.2883,2.2689,0.2348,3.2708,2.0517,0.2418,135.75,true,goal_reached,PASS,FAIL,FAIL
-mpc_combined,none,GDP-S3,7,profile,0.1161,0.3544,2.6097,0.2999,3.4444,2.2555,0.3207,95.95,true,goal_reached,PASS,FAIL,FAIL
-mpc_combined,none,GDP-S3-EXT,10,constant,1.2307,5.2722,5.821,2.1446,9.4929,14.6008,4.3471,36.3,true,goal_reached,FAIL,FAIL,FAIL

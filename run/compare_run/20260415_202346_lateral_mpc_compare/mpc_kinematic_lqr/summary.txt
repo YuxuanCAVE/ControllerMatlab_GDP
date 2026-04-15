@@ -1,0 +1,25 @@
+Controller: MPC Kinematic + LQR
+
+LATERAL
+  RMS CTE            : 0.0912 m
+  Peak CTE           : 0.3655 m
+  RMS heading error  : 2.250 deg
+  REQ-1 lateral      : PASS
+
+LONGITUDINAL
+  RMS speed error    : 0.0914 m/s
+  Peak speed error   : 0.6288 m/s
+  Peak lon deviation : 0.3727 m
+  RMS lon deviation  : 0.1003 m
+  REQ-1 longit       : PASS
+
+TIMING
+  Control loop       : 0.050 s (20 Hz)
+  Mean exec time     : 0.001076 s
+  Max exec time      : 0.033944 s
+  Real-time OK       : YES
+
+GENERAL
+  Loop time          : 118.75 s
+  Goal reached       : 1
+  Termination        : goal_reached

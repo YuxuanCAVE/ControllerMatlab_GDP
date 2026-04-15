@@ -19,19 +19,17 @@ veh = load_vehicle_params(cfg.vehicle.accel_map_file, cfg.vehicle.brake_map_file
 veh.max_steer = cfg.vehicle.max_steer;
 veh.max_steer_rate = cfg.vehicle.max_steer_rate;
 
-% ── Build controller display name ────────────────────────────────────
 use_combined = (cfg.controller.lateral == "mpc_combined");
 if use_combined
     ctrl_name = "MPC Combined";
-    ctrl_tag  = "mpc_combined";
+    ctrl_tag = "mpc_combined";
 else
     ctrl_name = sprintf('%s + %s', upper(char(cfg.controller.lateral)), ...
                                    upper(char(cfg.controller.longitudinal)));
-    ctrl_tag  = sprintf('%s_%s', char(cfg.controller.lateral), ...
+    ctrl_tag = sprintf('%s_%s', char(cfg.controller.lateral), ...
                                 char(cfg.controller.longitudinal));
 end
 
-% ── Speed mode display ────────────────────────────────────────────────
 if cfg.speed.mode == "constant"
     speed_info = sprintf('Constant %.1f m/s', cfg.speed.constant_value);
 else
@@ -45,65 +43,22 @@ fprintf('  Running: %s\n', ctrl_name);
 fprintf('  Speed:   %s\n', speed_info);
 fprintf('============================================================\n\n');
 
-if cfg.run.compare_longitudinal && ~use_combined
-    % ══════════════════════════════════════════════════════════════════
-    %  COMPARISON MODE
-    % ══════════════════════════════════════════════════════════════════
-    run_name = sprintf('%s_%s_compare', stamp, char(cfg.controller.lateral));
-    run_dir = fullfile(project_root, cfg.run.root_dir, run_name);
-    if ~exist(run_dir, 'dir'), mkdir(run_dir); end
+single_run_root = fullfile(project_root, cfg.run.root_dir, 'single_run');
+if ~exist(single_run_root, 'dir'), mkdir(single_run_root); end
 
-    controllers = cellstr(cfg.run.longitudinal_compare_set);
-    comparison.cfg = cfg;
-    comparison.results = struct();
-    comparison.names = {};
+run_name = sprintf('%s_%s', stamp, ctrl_tag);
+run_dir = fullfile(single_run_root, run_name);
+if ~exist(run_dir, 'dir'), mkdir(run_dir); end
 
-    for i = 1:numel(controllers)
-        cfg_case = cfg;
-        cfg_case.controller.longitudinal = string(controllers{i});
+result = run_closed_loop(cfg, ref, veh);
+save_result_plots(cfg, ref, result, run_dir, ctrl_name);
+save(fullfile(run_dir, 'result.mat'), 'cfg', 'ref', 'veh', 'result');
+write_summary_file(result, run_dir, ctrl_name);
+print_result(result, ctrl_name);
 
-        case_name = sprintf('%s + %s', upper(char(cfg.controller.lateral)), ...
-                                       upper(controllers{i}));
-        comparison.names{i} = case_name;
-
-        fprintf('Running: %s ...\n', case_name);
-
-        case_dir = fullfile(run_dir, controllers{i});
-        if ~exist(case_dir, 'dir'), mkdir(case_dir); end
-
-        result = run_closed_loop(cfg_case, ref, veh);
-        save_result_plots(cfg_case, ref, result, case_dir, case_name);
-        save(fullfile(case_dir, 'result.mat'), 'cfg_case', 'ref', 'veh', 'result');
-        write_summary_file(result, case_dir, case_name);
-        print_result(result, case_name);
-        comparison.results.(controllers{i}) = result;
-    end
-
-    save(fullfile(run_dir, 'comparison.mat'), 'comparison', 'ref', 'veh');
-    save_comparison_plots(cfg, ref, comparison, run_dir);
-    fprintf('\nSaved comparison to: %s\n', run_dir);
-
-else
-    % ══════════════════════════════════════════════════════════════════
-    %  SINGLE RUN MODE
-    % ══════════════════════════════════════════════════════════════════
-    run_name = sprintf('%s_%s', stamp, ctrl_tag);
-    run_dir = fullfile(project_root, cfg.run.root_dir, run_name);
-    if ~exist(run_dir, 'dir'), mkdir(run_dir); end
-
-    result = run_closed_loop(cfg, ref, veh);
-    save_result_plots(cfg, ref, result, run_dir, ctrl_name);
-    save(fullfile(run_dir, 'result.mat'), 'cfg', 'ref', 'veh', 'result');
-    write_summary_file(result, run_dir, ctrl_name);
-    print_result(result, ctrl_name);
-
-    fprintf('\nSaved to: %s\n', run_dir);
-end
+fprintf('\nSaved to: %s\n', run_dir);
 
 
-%% ═══════════════════════════════════════════════════════════════════
-%  PRINT RESULT TO CONSOLE
-%  ═══════════════════════════════════════════════════════════════════
 function print_result(result, ctrl_name)
     m = result.metrics;
 
@@ -137,7 +92,6 @@ function print_result(result, ctrl_name)
     fprintf('    Goal reached         : %d\n', m.goal_reached);
     fprintf('    Termination          : %s\n', char(m.termination_reason));
 
-    % Overall verdict
     lat_ok = m.peak_cte < 0.6;
     lon_ok = m.peak_lon_dev < 0.8;
     if lat_ok && lon_ok
@@ -151,10 +105,6 @@ function print_result(result, ctrl_name)
     fprintf('------------------------------------------------------------\n');
 end
 
-
-%% ═══════════════════════════════════════════════════════════════════
-%  PLOTS FOR SINGLE RUN — legends use ctrl_name
-%  ═══════════════════════════════════════════════════════════════════
 function save_result_plots(cfg, ref, result, run_dir, ctrl_name)
     log = result.log;
     m = result.metrics;
@@ -163,7 +113,6 @@ function save_result_plots(cfg, ref, result, run_dir, ctrl_name)
     sp_err = log.v_ref - log.v;
     lon_dev = cumsum(sp_err) * dt;
 
-    % ── 1: Path Tracking ──────────────────────────────────────────────
     fig1 = figure('Position', [100 100 800 600], 'Visible', 'off');
     plot(ref.x, ref.y, 'k--', 'LineWidth', 1.5, 'DisplayName', 'Reference');
     hold on;
@@ -173,7 +122,6 @@ function save_result_plots(cfg, ref, result, run_dir, ctrl_name)
     legend('Location', 'best'); grid on; axis equal;
     saveas(fig1, fullfile(run_dir, 'path_tracking.png')); close(fig1);
 
-    % ── 2: Tracking Errors (4 panels with RMS/Peak) ──────────────────
     fig2 = figure('Position', [100 100 1000 700], 'Visible', 'off');
 
     subplot(2,2,1);
@@ -203,7 +151,6 @@ function save_result_plots(cfg, ref, result, run_dir, ctrl_name)
     sgtitle(sprintf('Tracking Errors (%s)', ctrl_name));
     saveas(fig2, fullfile(run_dir, 'tracking_errors.png')); close(fig2);
 
-    % ── 3: Speed Tracking + Acceleration ──────────────────────────────
     fig3 = figure('Position', [100 100 1000 500], 'Visible', 'off');
 
     subplot(1,2,1);
@@ -223,7 +170,6 @@ function save_result_plots(cfg, ref, result, run_dir, ctrl_name)
     sgtitle(sprintf('Longitudinal (%s)', ctrl_name));
     saveas(fig3, fullfile(run_dir, 'speed_tracking.png')); close(fig3);
 
-    % ── 4: Lateral Dynamics ───────────────────────────────────────────
     fig4 = figure('Position', [100 100 1000 500], 'Visible', 'off');
 
     subplot(1,2,1);
@@ -243,96 +189,20 @@ function save_result_plots(cfg, ref, result, run_dir, ctrl_name)
     sgtitle(sprintf('Lateral Dynamics (%s)', ctrl_name));
     saveas(fig4, fullfile(run_dir, 'lateral_dynamics.png')); close(fig4);
 
-    % ── 5: Controller Execution Timing ────────────────────────────────
     fig5 = figure('Position', [100 100 800 400], 'Visible', 'off');
     plot(log.t, log.ctrl_exec_time_s * 1000, 'b-', 'DisplayName', char(ctrl_name));
     hold on;
     yline(m.ctrl_loop_dt * 1000, 'r--', 'LineWidth', 1.5, ...
         'DisplayName', sprintf('Loop period (%.0f ms)', m.ctrl_loop_dt*1000));
     xlabel('Time [s]'); ylabel('Execution Time [ms]');
-    title(sprintf('Controller Execution Time (%s) — mean %.3f ms, max %.3f ms', ...
+    title(sprintf('Controller Execution Time (%s) - mean %.3f ms, max %.3f ms', ...
         ctrl_name, m.ctrl_exec_mean_s*1000, m.ctrl_exec_max_s*1000));
     legend('Location', 'best'); grid on;
     saveas(fig5, fullfile(run_dir, 'execution_timing.png')); close(fig5);
+
+    save_sim_vs_bag_plot(log, run_dir, fullfile('data', 'bag_data_10hz.mat'), ctrl_name);
 end
 
-
-%% ═══════════════════════════════════════════════════════════════════
-%  COMPARISON PLOTS
-%  ═══════════════════════════════════════════════════════════════════
-function save_comparison_plots(cfg, ref, comparison, run_dir)
-    controllers = fieldnames(comparison.results);
-    colors = {'b', [0.85 0.33 0.1], [0.47 0.67 0.19], 'r'};
-    dt = cfg.sim.dt;
-
-    names = {};
-    for i = 1:numel(controllers)
-        names{i} = sprintf('%s + %s', upper(char(cfg.controller.lateral)), ...
-                                       upper(controllers{i}));
-    end
-
-    fig = figure('Position', [100 100 1100 800], 'Visible', 'off');
-
-    subplot(2,2,1);
-    plot(ref.x, ref.y, 'k--', 'LineWidth', 1.5, 'DisplayName', 'Reference'); hold on;
-    for i = 1:numel(controllers)
-        r = comparison.results.(controllers{i});
-        plot(r.log.x, r.log.y, '-', 'Color', colors{i}, 'LineWidth', 1.2, 'DisplayName', names{i});
-    end
-    title('Path Tracking'); legend('Location','best'); grid on;
-    xlabel('X [m]'); ylabel('Y [m]');
-
-    subplot(2,2,2);
-    r1 = comparison.results.(controllers{1});
-    plot(r1.log.t, r1.log.v_ref, 'k--', 'LineWidth', 1.5, 'DisplayName', 'Reference'); hold on;
-    for i = 1:numel(controllers)
-        r = comparison.results.(controllers{i});
-        plot(r.log.t, r.log.v, '-', 'Color', colors{i}, 'LineWidth', 1.2, 'DisplayName', names{i});
-    end
-    title('Speed Tracking'); legend('Location','best'); grid on;
-    xlabel('Time [s]'); ylabel('[m/s]');
-
-    subplot(2,2,3);
-    for i = 1:numel(controllers)
-        r = comparison.results.(controllers{i});
-        plot(r.log.t, r.log.ax_cmd_exec, '-', 'Color', colors{i}, 'LineWidth', 0.8, 'DisplayName', names{i});
-        hold on;
-    end
-    title('Executed Acceleration'); legend; grid on;
-    xlabel('Time [s]'); ylabel('[m/s^2]');
-
-    subplot(2,2,4);
-    for i = 1:numel(controllers)
-        r = comparison.results.(controllers{i});
-        se = r.log.v_ref - r.log.v;
-        plot(r.log.t, se, '-', 'Color', colors{i}, 'LineWidth', 0.8, 'DisplayName', names{i});
-        hold on;
-    end
-    title('Speed Error'); legend; grid on;
-    xlabel('Time [s]'); ylabel('[m/s]');
-
-    sgtitle(sprintf('Comparison (%s)', upper(char(cfg.controller.lateral))));
-    saveas(fig, fullfile(run_dir, 'longitudinal_comparison.png'));
-    close(fig);
-
-    % Summary file
-    fid = fopen(fullfile(run_dir, 'comparison_summary.txt'), 'w');
-    fprintf(fid, 'Lateral: %s\nCompared: %s\n\n', char(cfg.controller.lateral), strjoin(names, ' vs '));
-    fprintf(fid, '%-20s %-10s %-10s %-12s %-10s %-12s %-10s\n', ...
-        'Controller', 'RMS_CTE', 'Peak_CTE', 'RMS_Epsi', 'RMS_SpdE', 'PkLonDev', 'Loop_t');
-    for i = 1:numel(controllers)
-        r = comparison.results.(controllers{i}); rm = r.metrics;
-        fprintf(fid, '%-20s %-10.4f %-10.4f %-12.3f %-10.4f %-12.4f %-10.2f\n', ...
-            names{i}, rm.rms_cte, rm.peak_cte, rm.rms_epsi_deg, ...
-            rm.rms_speed_error, rm.peak_lon_dev, rm.single_loop_time_s);
-    end
-    fclose(fid);
-end
-
-
-%% ═══════════════════════════════════════════════════════════════════
-%  SUMMARY FILE
-%  ═══════════════════════════════════════════════════════════════════
 function write_summary_file(result, run_dir, ctrl_name)
     m = result.metrics;
     fid = fopen(fullfile(run_dir, 'summary.txt'), 'w');
@@ -365,10 +235,6 @@ function write_summary_file(result, run_dir, ctrl_name)
     fclose(fid);
 end
 
-
-%% ═══════════════════════════════════════════════════════════════════
-%  HELPERS
-%  ═══════════════════════════════════════════════════════════════════
 function r = iff(c, t, f)
     if c, r = t; else, r = f; end
 end
