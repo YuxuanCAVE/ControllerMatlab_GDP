@@ -1,6 +1,8 @@
-function lon_force = longitudinal_model(vx, a_des, veh)
+function [lon_force, lon] = longitudinal_model(vx, a_des, veh, lon)
     % Main longitudinal model wrapper used by the current project.
     % Internally it delegates the force generation to a standalone module.
+
+    lon = ensure_actuator_state(lon);
 
     Velocity = vx;
 
@@ -20,11 +22,19 @@ function lon_force = longitudinal_model(vx, a_des, veh)
     ACC_req = 0;
     BRK_req = 0;
     F_drive_actual = 0;
+    branch_mode = 0;
+    branch_drive = 0;
+    branch_brake = 0;
+    branch_coast = 0;
 
     F_required = M * a_des + F_resist;
+    lon = update_actuator_mode(F_required, lon, veh);
+    F_branch_eps = 1.0;
 
-    if F_required >= 0
-        F_tractive_required = F_required;
+    if lon.actuator_mode == "drive"
+        F_tractive_required = max(F_required, veh.acc.force_min_effective);
+        branch_mode = 1;
+        branch_drive = 1;
 
         ACC_req = invert_force_map_1d(F_tractive_required, veh.acc);
         if isnan(ACC_req)
@@ -49,8 +59,10 @@ function lon_force = longitudinal_model(vx, a_des, veh)
                 ACC_internal, ...
                 'linear', 'extrap');
         end
-    else
-        F_brake_required = max(-F_required, 0);
+    elseif lon.actuator_mode == "brake"
+        F_brake_required = max(-F_required, veh.brk.force_min_effective);
+        branch_mode = -1;
+        branch_brake = 1;
 
         BRK_req = invert_force_map_1d(F_brake_required, veh.brk);
         if isnan(BRK_req)
@@ -77,6 +89,10 @@ function lon_force = longitudinal_model(vx, a_des, veh)
         end
 
         F_drive_actual = -F_brake_actual;
+    else
+        branch_mode = 0;
+        branch_coast = 1;
+        F_drive_actual = 0;
     end
 
     F_total = F_drive_actual - F_resist;
@@ -96,10 +112,20 @@ function lon_force = longitudinal_model(vx, a_des, veh)
     lon_force.F_required = F_required;
     lon_force.F_drive_actual = F_drive_actual;
     lon_force.F_total = F_total;
+    lon_force.branch_mode = branch_mode;
+    lon_force.branch_drive = branch_drive;
+    lon_force.branch_brake = branch_brake;
+    lon_force.branch_coast = branch_coast;
+    lon_force.F_branch_eps = F_branch_eps;
 end
 
 function force = eval_force_map_1d(cmd, map)
-    cmd_q = min(max(cmd, map.cmd_min), map.cmd_max);
+    if cmd < map.cmd_min_effective
+        force = 0;
+        return;
+    end
+
+    cmd_q = min(max(cmd, map.cmd_min_effective), map.cmd_max);
 
     try
         [cmd_axis, idx] = sort(map.cmd_full);
@@ -119,7 +145,7 @@ function force = eval_force_map_1d(cmd, map)
 end
 
 function cmd = invert_force_map_1d(force_target, map)
-    cmd_lo = map.cmd_min;
+    cmd_lo = map.cmd_min_effective;
     cmd_hi = map.cmd_max;
 
     try
@@ -133,9 +159,53 @@ function cmd = invert_force_map_1d(force_target, map)
             return;
         end
 
+        if force_target < map.force_min_effective
+            cmd = 0;
+            return;
+        end
+
         cmd = interp1(force_axis, cmd_axis, force_target, 'linear', 'extrap');
         cmd = min(max(cmd, cmd_lo), cmd_hi);
     catch
         cmd = NaN;
+    end
+end
+
+function lon = ensure_actuator_state(lon)
+    if nargin < 1 || isempty(lon)
+        lon = struct();
+    end
+    if ~isfield(lon, 'actuator_mode') || isempty(lon.actuator_mode)
+        lon.actuator_mode = "coast";
+    end
+end
+
+function lon = update_actuator_mode(F_required, lon, veh)
+    drive_enter = veh.acc.force_min_effective;
+    drive_exit = veh.acc.force_exit_coast;
+    brake_enter = veh.brk.force_min_effective;
+    brake_exit = veh.brk.force_exit_coast;
+
+    switch lon.actuator_mode
+        case "drive"
+            if F_required <= -brake_enter
+                lon.actuator_mode = "brake";
+            elseif F_required <= drive_exit
+                lon.actuator_mode = "coast";
+            end
+        case "brake"
+            if F_required >= drive_enter
+                lon.actuator_mode = "drive";
+            elseif F_required >= -brake_exit
+                lon.actuator_mode = "coast";
+            end
+        otherwise
+            if F_required >= drive_enter
+                lon.actuator_mode = "drive";
+            elseif F_required <= -brake_enter
+                lon.actuator_mode = "brake";
+            else
+                lon.actuator_mode = "coast";
+            end
     end
 end

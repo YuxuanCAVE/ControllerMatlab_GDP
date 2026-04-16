@@ -1,0 +1,26 @@
+Controller: MPC_KINEMATIC + PID
+
+LATERAL:
+  RMS CTE            : 0.2078 m
+  Peak CTE           : 0.6143 m
+  RMS heading error  : 2.554 deg
+  REQ-1 (<0.6m)      : FAIL
+
+LONGITUDINAL:
+  RMS speed error    : 0.1377 m/s
+  Peak speed error   : 1.3970 m/s
+  Peak lon deviation : 11.2082 m
+  RMS lon deviation  : 6.8561 m
+  REQ-1 (<0.8m)      : FAIL
+
+TIMING:
+  Control loop       : 0.100 s (10 Hz)
+  Mean exec time     : 0.000763 s (0.763 ms)
+  Max exec time      : 0.003036 s (3.036 ms)
+  Real-time OK       : YES
+
+GENERAL:
+  Loop time          : 123.70 s
+  Goal reached       : 1
+  Termination        : goal_reached
+  Run directory      : F:\Controller_GDP\run\single_run\20260417_002703_mpc_kinematic_pid

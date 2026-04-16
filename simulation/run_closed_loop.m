@@ -21,12 +21,15 @@ function result = run_closed_loop(cfg, ref, veh)
     state.z_lon = 0.0;
 
     use_combined_mpc = (cfg.controller.lateral == "mpc_combined");
+    use_fake_lateral = (~use_combined_mpc && cfg.controller.lateral == "fake_controller");
+    use_fake_longitudinal = (~use_combined_mpc && cfg.controller.longitudinal == "fake_controller");
 
     if ~use_combined_mpc
         switch cfg.controller.longitudinal
             case "pid", lon = cfg.lon_pid;
             case "lqr", lon = cfg.lon_lqr;
             case "lqr_force_balance", lon = cfg.lon_lqr_force;
+            case "fake_controller", lon = struct();
             otherwise, error('Unknown longitudinal controller: %s', cfg.controller.longitudinal);
         end
     else
@@ -73,6 +76,8 @@ function result = run_closed_loop(cfg, ref, veh)
     log.brake_raw = zeros(Nsim, 1);
     log.throttle = zeros(Nsim, 1);
     log.brake = zeros(Nsim, 1);
+    log.ACC_req = zeros(Nsim, 1);
+    log.BRK_req = zeros(Nsim, 1);
     log.vy = zeros(Nsim, 1);
     log.r = zeros(Nsim, 1);
     log.beta = zeros(Nsim, 1);
@@ -85,6 +90,10 @@ function result = run_closed_loop(cfg, ref, veh)
     log.F_required = zeros(Nsim, 1);
     log.F_total = zeros(Nsim, 1);
     log.F_drive = zeros(Nsim, 1);
+    log.branch_mode = zeros(Nsim, 1);
+    log.branch_drive = zeros(Nsim, 1);
+    log.branch_brake = zeros(Nsim, 1);
+    log.branch_coast = zeros(Nsim, 1);
     log.idx = zeros(Nsim, 1);
     log.e_ct = zeros(Nsim, 1);
     log.e_psi = zeros(Nsim, 1);
@@ -118,6 +127,11 @@ function result = run_closed_loop(cfg, ref, veh)
         speed_error_now = v_ref_now - state.v;
         state.z_lon = state.z_lon + speed_error_now * dt;
 
+        if use_fake_longitudinal
+            state.v = v_ref_now;
+            state.vx = v_ref_now;
+        end
+
         compute_ctrl = (mod(k-1, ctrl_period) == 0);
 
         ctrl_tic = tic;
@@ -147,6 +161,8 @@ function result = run_closed_loop(cfg, ref, veh)
                 case "mpc_kinematic"
                     delta_cmd = mpc_kinematic_lateral(state, ref, veh, dt, cfg.mpc_kinematic, ...
                         idx_progress, cfg.sim.progress_window, steer_delay_buffer);
+                case "fake_controller"
+                    delta_cmd = 0.0;
                 otherwise
                     error('Unknown lateral controller: %s', cfg.controller.lateral);
             end
@@ -158,6 +174,8 @@ function result = run_closed_loop(cfg, ref, veh)
                     [a_des_raw, lon] = LQR_controller(v_ref_now, state.v, lon, dt);
                 case "lqr_force_balance"
                     [a_des_raw, lon] = longitudinal_lqr_force_balance_controller(v_ref_now, state.v, lon, dt, veh);
+                case "fake_controller"
+                    a_des_raw = 0.0;
                 otherwise
                     error('Unknown longitudinal controller: %s', cfg.controller.longitudinal);
             end
@@ -170,10 +188,29 @@ function result = run_closed_loop(cfg, ref, veh)
         [delta_cmd_delayed, steer_delay_buffer] = apply_delay(delta_cmd_raw, steer_delay_buffer);
         delta_cmd_exec = rate_limit(delta_cmd_delayed, state.delta, veh.max_steer_rate, dt);
 
-        [a_des_exec, lon_delay_buffer] = apply_delay(a_des_raw, lon_delay_buffer);
-        lon_model = longitudinal_model(state.v, a_des_exec, veh);
+        if use_fake_longitudinal
+            a_des_exec = 0.0;
+            lon_model = fake_longitudinal_model(state.v, veh);
+        else
+            [a_des_exec, lon_delay_buffer] = apply_delay(a_des_raw, lon_delay_buffer);
+            [lon_model, lon] = longitudinal_model(state.v, a_des_exec, veh, lon);
+        end
 
-        [state, ax_actual, lat] = lateral_model(state, delta_cmd_exec, lon_model, dt, veh);
+        if use_fake_lateral
+            [state, ax_actual, lat, idx_progress] = fake_lateral_step( ...
+                state, lon_model, dt, veh, ref, idx_progress, cfg.sim.progress_window);
+        else
+            [state, ax_actual, lat] = lateral_model(state, delta_cmd_exec, lon_model, dt, veh, cfg);
+        end
+
+        if use_fake_longitudinal
+            state.v = v_ref_now;
+            state.vx = v_ref_now;
+            ax_actual = 0.0;
+            lon_model.a_des = 0.0;
+            lon_model.a_actual = 0.0;
+            lon_model.F_total = 0.0;
+        end
 
         log.t(k) = (k-1) * dt;
         log.x(k) = state.x;
@@ -195,6 +232,8 @@ function result = run_closed_loop(cfg, ref, veh)
         log.brake_raw(k) = lon_model.brake_pct_raw;
         log.throttle(k) = lon_model.throttle_pct;
         log.brake(k) = lon_model.brake_pct;
+        log.ACC_req(k) = lon_model.ACC_req;
+        log.BRK_req(k) = lon_model.BRK_req;
         log.ay(k) = lat.ay;
         log.alpha_f(k) = lat.alpha_f;
         log.alpha_r(k) = lat.alpha_r;
@@ -204,6 +243,10 @@ function result = run_closed_loop(cfg, ref, veh)
         log.F_required(k) = lon_model.F_required;
         log.F_total(k) = lon_model.F_total;
         log.F_drive(k) = lon_model.F_drive_actual;
+        log.branch_mode(k) = lon_model.branch_mode;
+        log.branch_drive(k) = lon_model.branch_drive;
+        log.branch_brake(k) = lon_model.branch_brake;
+        log.branch_coast(k) = lon_model.branch_coast;
         log.idx(k) = idx_near;
         log.e_ct(k) = e_ct;
         log.e_psi(k) = e_psi;
@@ -263,6 +306,116 @@ function result = run_closed_loop(cfg, ref, veh)
     result.metrics.ctrl_exec_max_s = max(ctrl_times);
     result.metrics.ctrl_exec_std_s = std(ctrl_times);
     result.metrics.ctrl_realtime_ok = (max(ctrl_times) < ctrl_dt);
+end
+
+function [state_next, ax, lat, idx_progress] = fake_lateral_step(state, lon_force, dt, veh, ref, idx_hint, window)
+    v_curr = max(state.v, 0.0);
+    ax = lon_force.a_actual;
+    v_next = max(0.0, v_curr + ax * dt);
+    ds = max(0.0, 0.5 * (v_curr + v_next) * dt);
+
+    [~, ~, ~, ~, ~, seg_idx, seg_t] = nearest_path_ref_point( ...
+        state.x, state.y, ref.x, ref.y, idx_hint, window);
+    [x_next, y_next, yaw_next, idx_progress] = advance_along_reference(ref, seg_idx, seg_t, ds);
+
+    state_next = state;
+    state_next.x = x_next;
+    state_next.y = y_next;
+    state_next.yaw = yaw_next;
+    state_next.v = v_next;
+    state_next.vx = v_next;
+    state_next.vy = 0.0;
+    state_next.r = 0.0;
+    state_next.beta = 0.0;
+    state_next.delta = 0.0;
+
+    lat.vx = v_next;
+    lat.vy = 0.0;
+    lat.r = 0.0;
+    lat.beta = 0.0;
+    lat.ay = 0.0;
+    lat.alpha_f = 0.0;
+    lat.alpha_r = 0.0;
+    lat.Fy_f = 0.0;
+    lat.Fy_r = 0.0;
+end
+
+function [x, y, yaw, idx_out] = advance_along_reference(ref, seg_idx, seg_t, ds)
+    n = numel(ref.x);
+    if n < 2
+        x = ref.x(1);
+        y = ref.y(1);
+        yaw = ref.yaw(1);
+        idx_out = 1;
+        return;
+    end
+
+    if isnan(seg_idx) || seg_idx < 1
+        seg_idx = 1;
+    end
+    seg_idx = min(seg_idx, n - 1);
+    seg_t = min(max(seg_t, 0.0), 1.0);
+
+    idx = seg_idx;
+    t = seg_t;
+    remaining = ds;
+
+    while idx < n
+        Ax = ref.x(idx);
+        Ay = ref.y(idx);
+        Bx = ref.x(idx + 1);
+        By = ref.y(idx + 1);
+        seg_len = hypot(Bx - Ax, By - Ay);
+
+        if seg_len < 1e-9
+            idx = idx + 1;
+            t = 0.0;
+            continue;
+        end
+
+        seg_remaining = (1.0 - t) * seg_len;
+        if remaining <= seg_remaining
+            t = t + remaining / seg_len;
+            x = Ax + t * (Bx - Ax);
+            y = Ay + t * (By - Ay);
+            yaw = atan2(By - Ay, Bx - Ax);
+            idx_out = idx;
+            return;
+        end
+
+        remaining = remaining - seg_remaining;
+        idx = idx + 1;
+        t = 0.0;
+    end
+
+    x = ref.x(end);
+    y = ref.y(end);
+    yaw = ref.yaw(end);
+    idx_out = n;
+end
+
+function lon_force = fake_longitudinal_model(vx, veh)
+    F_resist = veh.A + veh.B * vx + veh.C * vx^2;
+
+    lon_force.a_des = 0.0;
+    lon_force.a_actual = 0.0;
+    lon_force.throttle_pct_raw = 0.0;
+    lon_force.brake_pct_raw = 0.0;
+    lon_force.throttle_pct = 0.0;
+    lon_force.brake_pct = 0.0;
+    lon_force.ACC_req = 0.0;
+    lon_force.BRK_req = 0.0;
+    lon_force.F_grad = 0.0;
+    lon_force.F_aero_plus_road = F_resist;
+    lon_force.F_resist = F_resist;
+    lon_force.F_required = 0.0;
+    lon_force.F_drive_actual = F_resist;
+    lon_force.F_total = 0.0;
+    lon_force.branch_mode = 0.0;
+    lon_force.branch_drive = 0.0;
+    lon_force.branch_brake = 0.0;
+    lon_force.branch_coast = 1.0;
+    lon_force.F_branch_eps = 1.0;
 end
 
 

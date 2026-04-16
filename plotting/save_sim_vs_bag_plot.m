@@ -122,7 +122,7 @@ function saved = save_sim_vs_bag_plot(log, run_dir, bag_mat_path, title_suffix)
     grid on;
 
     if strlength(string(title_suffix)) > 0
-        sgtitle(sprintf('Simulation vs Bag Comparison'));
+        sgtitle(sprintf('Simulation vs Bag Comparison (%s)', char(string(title_suffix))));
     else
         sgtitle('Simulation vs Bag Comparison');
     end

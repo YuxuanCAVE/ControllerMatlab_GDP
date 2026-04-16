@@ -76,6 +76,31 @@ function veh = load_vehicle_params(accel_map_file, brake_map_file)
 
     veh.max_pedal_publish = 0.60;
 
+    % Effective publish deadzone observed in the real DBW interface.
+    % Commands below this level are treated as zero output.
+    veh.acc.pedal_min_publish_from_map = ...
+        (veh.acc.cmd_min / max(veh.acc.acc_full)) * veh.max_pedal_publish;
+    veh.brk.pedal_min_publish_from_map = ...
+        (veh.brk.cmd_min / max(veh.brk.brake_full)) * veh.max_pedal_publish;
+
+    veh.acc.pedal_min_effective = veh.acc.pedal_min_publish_from_map;
+    veh.brk.pedal_min_effective = veh.brk.pedal_min_publish_from_map;
+
+    veh.acc.cmd_min_effective = ...
+        (veh.acc.pedal_min_effective / veh.max_pedal_publish) * max(veh.acc.acc_full);
+    veh.brk.cmd_min_effective = ...
+        (veh.brk.pedal_min_effective / veh.max_pedal_publish) * max(veh.brk.brake_full);
+
+    veh.acc.force_min_effective = interp1( ...
+        veh.acc.acc_full, veh.acc.force_full, veh.acc.cmd_min_effective, ...
+        'linear', 'extrap');
+    veh.brk.force_min_effective = interp1( ...
+        veh.brk.brake_full, veh.brk.force_full, veh.brk.cmd_min_effective, ...
+        'linear', 'extrap');
+
+    veh.acc.force_exit_coast = 0.5 * veh.acc.force_min_effective;
+    veh.brk.force_exit_coast = 0.5 * veh.brk.force_min_effective;
+
     % ── Compute acceleration limits from actuator maps ────────────────
     % These are the ACTUAL physical limits of the vehicle at 60% pedal cap.
     %
@@ -128,6 +153,10 @@ function veh = load_vehicle_params(accel_map_file, brake_map_file)
     fprintf('    Max braking force:   %.1f N\n', F_brake_max);
     fprintf('    a_max (from map):    %.3f m/s^2\n', veh.a_max_from_map);
     fprintf('    a_min (from map):    %.3f m/s^2\n', veh.a_min_from_map);
+    fprintf('    Min accel publish:   %.4f (map), %.4f (effective)\n', ...
+        veh.acc.pedal_min_publish_from_map, veh.acc.pedal_min_effective);
+    fprintf('    Min brake publish:   %.4f (map), %.4f (effective)\n', ...
+        veh.brk.pedal_min_publish_from_map, veh.brk.pedal_min_effective);
 end
 
 function out = get_first_existing_field(S, names)

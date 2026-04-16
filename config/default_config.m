@@ -1,6 +1,7 @@
 function cfg = default_config()
-    cfg.controller.lateral = "mpc_kinematic";  % "stanley" | "pure_pursuit" | "mpc" | "mpc_kinematic" | "mpc_combined"
-    cfg.controller.longitudinal = "pid";      % "pid" | "lqr" | "lqr_force_balance" (ignored when lateral = "mpc_combined")
+    cfg.controller.lateral = "mpc_kinematic";  % "stanley" | "pure_pursuit" | "mpc" | "mpc_kinematic" | "mpc_combined" | "fake_controller"
+    cfg.controller.longitudinal = "pid";      % "pid" | "lqr" | "lqr_force_balance" | "fake_controller" (ignored when lateral = "mpc_combined")
+    cfg.plant.lateral_model = "dynamic";        % "dynamic" | "bicycle_linear"
 
     cfg.sim.dt = 0.1;
     cfg.sim.T_end = 150;
@@ -11,10 +12,11 @@ function cfg = default_config()
 
     cfg.vehicle.accel_map_file = fullfile('data', 'Acc_mapData_noSlope.mat');
     cfg.vehicle.brake_map_file = fullfile('data', 'brake_mapData_noSlope.mat');
-    cfg.vehicle.max_steer = deg2rad(35);       % max steering angle (rad)
-    cfg.vehicle.max_steer_rate = deg2rad(40);   % max steering rate (rad/s)
+    cfg.vehicle.max_steer = deg2rad(20);       % max steering angle (rad)
+    cfg.vehicle.max_steer_rate = deg2rad(15);   % max steering rate (rad/s)
     cfg.vehicle.delay.steer_s = 0.1;            % steering actuator delay (s)
     cfg.vehicle.delay.longitudinal_s = 0.1;     % throttle/brake actuator delay (s)
+    
 
     % ── Speed reference ───────────────────────────────────────────────
     % To use constant speed: set mode = "constant" and constant_value
@@ -22,7 +24,7 @@ function cfg = default_config()
     cfg.speed.mode = "constant";   % "constant" | "profile"
     cfg.speed.constant_value = 3;  % used when mode = "constant" (m/s)
     cfg.speed.profile_file = fullfile( ...
-        'data', 'reference_velocity', 'referencePath_Velocity_peak_velocity_5.mat');
+        'data', 'reference_velocity', 'referencePath_Velocity_peak_velocity_3.mat');
     % Available profiles: peak_velocity_3, 4, 5, 7 .mat
 
     % ── Acceleration limits from actuator maps ────────────────────────
@@ -55,11 +57,11 @@ function cfg = default_config()
     cfg.mpc.max_steer = cfg.vehicle.max_steer;
 
     % Kinematic bicycle MPC lateral only
-    cfg.mpc_kinematic.N = 24;
-    cfg.mpc_kinematic.Q = diag([2, 2]);
-    cfg.mpc_kinematic.R = 4;
-    cfg.mpc_kinematic.Rd = 50.0;
-    cfg.mpc_kinematic.kappa_ff_gain = 0.4;
+    cfg.mpc_kinematic.N = 16;
+    cfg.mpc_kinematic.Q = diag([2.2, 0.8]);
+    cfg.mpc_kinematic.R = 25;
+    cfg.mpc_kinematic.Rd = 15.0;
+    cfg.mpc_kinematic.kappa_ff_gain = 0.1;
     cfg.mpc_kinematic.max_steer = cfg.vehicle.max_steer;
     cfg.mpc_kinematic.fallback_k_e_y = 0.9;
     cfg.mpc_kinematic.fallback_k_e_psi = 1.4;
@@ -79,8 +81,8 @@ function cfg = default_config()
     cfg.mpc_combined.a_max = cfg.accel_limits.a_max;
 
     % ── PID longitudinal ──────────────────────────────────────────────
-    cfg.lon_pid.kp = 1.2;
-    cfg.lon_pid.ki = 0.01;
+    cfg.lon_pid.kp = 1.6;
+    cfg.lon_pid.ki = 0.0;
     cfg.lon_pid.kd = 0.0;
     cfg.lon_pid.a_min = cfg.accel_limits.a_min;
     cfg.lon_pid.a_max = cfg.accel_limits.a_max;

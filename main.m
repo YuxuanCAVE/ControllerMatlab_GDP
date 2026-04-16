@@ -20,14 +20,15 @@ veh.max_steer = cfg.vehicle.max_steer;
 veh.max_steer_rate = cfg.vehicle.max_steer_rate;
 
 use_combined = (cfg.controller.lateral == "mpc_combined");
+plant_tag = char(cfg.plant.lateral_model);
 if use_combined
-    ctrl_name = "MPC Combined";
-    ctrl_tag = "mpc_combined";
+    ctrl_name = sprintf('MPC Combined | plant=%s', upper(plant_tag));
+    ctrl_tag = sprintf('mpc_combined_%s', plant_tag);
 else
-    ctrl_name = sprintf('%s + %s', upper(char(cfg.controller.lateral)), ...
-                                   upper(char(cfg.controller.longitudinal)));
-    ctrl_tag = sprintf('%s_%s', char(cfg.controller.lateral), ...
-                                char(cfg.controller.longitudinal));
+    ctrl_name = sprintf('%s + %s | plant=%s', upper(char(cfg.controller.lateral)), ...
+                                   upper(char(cfg.controller.longitudinal)), upper(plant_tag));
+    ctrl_tag = sprintf('%s_%s_%s', char(cfg.controller.lateral), ...
+                                char(cfg.controller.longitudinal), plant_tag);
 end
 
 if cfg.speed.mode == "constant"
@@ -199,6 +200,50 @@ function save_result_plots(cfg, ref, result, run_dir, ctrl_name)
         ctrl_name, m.ctrl_exec_mean_s*1000, m.ctrl_exec_max_s*1000));
     legend('Location', 'best'); grid on;
     saveas(fig5, fullfile(run_dir, 'execution_timing.png')); close(fig5);
+
+    fig6 = figure('Position', [100 100 1200 900], 'Visible', 'off');
+
+    subplot(4,1,1);
+    plot(log.t, log.F_required, 'k-', 'LineWidth', 1.2, 'DisplayName', 'F_{required}');
+    hold on;
+    plot(log.t, log.F_drive, 'b-', 'LineWidth', 1.0, 'DisplayName', 'F_{drive,actual}');
+    yline(0, 'k--');
+    xlabel('Time [s]'); ylabel('[N]');
+    title('Force Balance Internals');
+    legend('Location', 'best'); grid on;
+
+    subplot(4,1,2);
+    plot(log.t, log.throttle, 'g-', 'LineWidth', 1.1, 'DisplayName', 'throttle\_pct');
+    hold on;
+    plot(log.t, log.brake, 'r-', 'LineWidth', 1.1, 'DisplayName', 'brake\_pct');
+    xlabel('Time [s]'); ylabel('[0-1]');
+    title('Pedal Commands');
+    legend('Location', 'best'); grid on;
+
+    subplot(4,1,3);
+    plot(log.t, log.ACC_req, 'g-', 'LineWidth', 1.1, 'DisplayName', 'ACC\_req');
+    hold on;
+    plot(log.t, log.BRK_req, 'r-', 'LineWidth', 1.1, 'DisplayName', 'BRK\_req');
+    xlabel('Time [s]'); ylabel('Map cmd');
+    title('Lookup Requests');
+    legend('Location', 'best'); grid on;
+
+    subplot(4,1,4);
+    stairs(log.t, log.branch_mode, 'k-', 'LineWidth', 1.2, 'DisplayName', 'branch\_mode');
+    hold on;
+    stairs(log.t, log.branch_drive, 'g--', 'LineWidth', 1.0, 'DisplayName', 'drive');
+    stairs(log.t, log.branch_coast, 'b--', 'LineWidth', 1.0, 'DisplayName', 'coast');
+    stairs(log.t, log.branch_brake, 'r--', 'LineWidth', 1.0, 'DisplayName', 'brake');
+    yline(0, 'k:');
+    ylim([-1.2, 1.2]);
+    yticks([-1 0 1]);
+    yticklabels({'brake', 'coast', 'drive'});
+    xlabel('Time [s]'); ylabel('Branch');
+    title('Actuator Branch Selection');
+    legend('Location', 'best'); grid on;
+
+    sgtitle(sprintf('Longitudinal Internal Diagnostics (%s)', ctrl_name));
+    saveas(fig6, fullfile(run_dir, 'longitudinal_internal_diagnostics.png')); close(fig6);
 
     save_sim_vs_bag_plot(log, run_dir, fullfile('data', 'bag_data_10hz.mat'), ctrl_name);
 end
