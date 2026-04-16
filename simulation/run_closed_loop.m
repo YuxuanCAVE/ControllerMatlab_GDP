@@ -26,6 +26,7 @@ function result = run_closed_loop(cfg, ref, veh)
         switch cfg.controller.longitudinal
             case "pid", lon = cfg.lon_pid;
             case "lqr", lon = cfg.lon_lqr;
+            case "lqr_force_balance", lon = cfg.lon_lqr_force;
             otherwise, error('Unknown longitudinal controller: %s', cfg.controller.longitudinal);
         end
     else
@@ -68,6 +69,8 @@ function result = run_closed_loop(cfg, ref, veh)
     log.ax = zeros(Nsim, 1);
     log.ax_cmd = zeros(Nsim, 1);
     log.ax_cmd_exec = zeros(Nsim, 1);
+    log.throttle_raw = zeros(Nsim, 1);
+    log.brake_raw = zeros(Nsim, 1);
     log.throttle = zeros(Nsim, 1);
     log.brake = zeros(Nsim, 1);
     log.vy = zeros(Nsim, 1);
@@ -153,6 +156,8 @@ function result = run_closed_loop(cfg, ref, veh)
                     [a_des_raw, lon] = PID_controller(v_ref_now, state.v, lon, dt);
                 case "lqr"
                     [a_des_raw, lon] = LQR_controller(v_ref_now, state.v, lon, dt);
+                case "lqr_force_balance"
+                    [a_des_raw, lon] = longitudinal_lqr_force_balance_controller(v_ref_now, state.v, lon, dt, veh);
                 otherwise
                     error('Unknown longitudinal controller: %s', cfg.controller.longitudinal);
             end
@@ -186,6 +191,8 @@ function result = run_closed_loop(cfg, ref, veh)
         log.ax(k) = ax_actual;
         log.ax_cmd(k) = a_des_raw;
         log.ax_cmd_exec(k) = a_des_exec;
+        log.throttle_raw(k) = lon_model.throttle_pct_raw;
+        log.brake_raw(k) = lon_model.brake_pct_raw;
         log.throttle(k) = lon_model.throttle_pct;
         log.brake(k) = lon_model.brake_pct;
         log.ay(k) = lat.ay;

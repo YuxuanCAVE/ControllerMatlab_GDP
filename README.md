@@ -7,26 +7,44 @@ ROS2 node repository:
 
 ## Overview
 
-This project contains:
+This repository simulates a decoupled lateral and longitudinal control stack on a coupled bicycle-model plant. The current codebase is centred around:
 
-- Reference-path based closed-loop simulation for the Kia Niro platform
-- Decoupled lateral and longitudinal controllers
-- A combined MPC baseline
-- Vehicle and actuator models based on measured map data
-- ROS2 bag import and plotting utilities
-- Single-run and controller-comparison workflows with auto-saved results
+- `mpc_kinematic` for lateral path tracking
+- `pid` for longitudinal speed tracking
+- a coupled planar bicycle plant
+- 1D longitudinal actuator lookup maps for self-consistent force-command conversion
+- ROS2 bag comparison plots for steering, speed, throttle, and brake
+
+The main recent changes are:
+
+- longitudinal actuator lookup has been simplified to a fully 1D mapping
+- the longitudinal actuator branch now switches based on `F_required`, not directly on the sign of `a_des`
+- the kinematic MPC cost now includes state, steering magnitude, and steering rate-change penalties
+- the current default workflow is to tune lateral first, then tune longitudinal PID on top of the locked lateral baseline
+
+## Current Default Setup
+
+The current default selection in [config/default_config.m](/f:/Controller_GDP/config/default_config.m) is:
+
+```matlab
+cfg.controller.lateral = "mpc_kinematic";
+cfg.controller.longitudinal = "pid";
+```
+
+The current default tuning values in that file are the active baseline. Always treat that file as the ground truth if this README and local experiments diverge.
 
 ## Controllers
 
 | Controller | Type | Description |
 |---|---|---|
-| `stanley` | Lateral | Heading + cross-track error correction |
-| `pure_pursuit` | Lateral | Lookahead-based geometric steering |
+| `stanley` | Lateral | Heading + cross-track correction |
+| `pure_pursuit` | Lateral | Lookahead geometric steering |
 | `mpc` | Lateral | Dynamic bicycle model MPC |
-| `mpc_kinematic` | Lateral | Kinematic bicycle model MPC with curvature preview |
-| `mpc_combined` | Lateral + Longitudinal | Single QP for steering and acceleration |
-| `pid` | Longitudinal | Classical PID speed controller |
-| `lqr` | Longitudinal | LQR speed controller with integral action |
+| `mpc_kinematic` | Lateral | Kinematic bicycle MPC with curvature preview and steering delay compensation |
+| `mpc_combined` | Lateral + Longitudinal | Combined steering/acceleration MPC baseline |
+| `pid` | Longitudinal | Speed-error PID producing `a_des` |
+| `lqr` | Longitudinal | Longitudinal LQR with anti-chatter shaping |
+| `lqr_force_balance` | Longitudinal | Force-balance LQR around resistance equilibrium |
 
 ## Quick Start
 
@@ -36,51 +54,114 @@ Open MATLAB in the project root and run:
 main
 ```
 
-This executes a single simulation using the controller selection in `config/default_config.m`.
+This will:
+
+- load the reference path and speed profile
+- load vehicle and actuator map data
+- run one closed-loop simulation
+- save plots and summary files under `run/single_run/...`
+
+## Current Signal Chain
+
+### Lateral
+
+The main lateral chain is:
+
+```text
+reference path
+  -> mpc_kinematic_lateral
+  -> steering delay buffer
+  -> steering rate limit
+  -> lateral_tire_model
+  -> coupled_bicycle_dynamics
+```
+
+The current `mpc_kinematic` cost is:
+
+```text
+J = X'QX + U'RU + Rd * dU'dU
+```
+
+This is implemented in [controllers/lateral/mpc_kinematic_lateral.m](/f:/Controller_GDP/controllers/lateral/mpc_kinematic_lateral.m).
+
+### Longitudinal
+
+The main longitudinal chain is:
+
+```text
+v_ref, v
+  -> PID_controller
+  -> a_des
+  -> longitudinal delay buffer
+  -> longitudinal_model
+  -> 1D inverse lookup: force -> cmd
+  -> 1D forward lookup: cmd -> force
+  -> coupled_bicycle_dynamics
+```
+
+This is intentionally self-consistent now: both inverse and forward actuator conversion are 1D. The current implementation lives in [model/longitudinal_model.m](/f:/Controller_GDP/model/longitudinal_model.m).
+
+## Longitudinal Actuator Model
+
+The current longitudinal actuator model no longer uses velocity-dependent 2D execution inside the plant. Instead:
+
+- `force_target -> cmd` uses 1D interpolation on `force_full` / `cmd_full`
+- `cmd -> force` uses the matching 1D interpolation on the same reduced map
+
+This change was made to keep actuator inversion and actuator execution self-consistent during tuning and debugging.
+
+The branch logic is now:
+
+```matlab
+F_required = M * a_des + F_resist;
+
+if F_required >= 0
+    % drive branch
+else
+    % brake branch
+end
+```
+
+This avoids the earlier issue where small negative `a_des` values could still correspond to positive required drive force once resistance was included.
 
 ## Controller Selection
 
 Edit [config/default_config.m](/f:/Controller_GDP/config/default_config.m):
 
 ```matlab
-% Lateral controller
-cfg.controller.lateral = "mpc_kinematic";   % "stanley" | "pure_pursuit" | "mpc" | "mpc_kinematic" | "mpc_combined"
-
-% Longitudinal controller
-cfg.controller.longitudinal = "lqr";        % "pid" | "lqr"
+cfg.controller.lateral = "mpc_kinematic";
+cfg.controller.longitudinal = "pid";
 ```
 
 Typical combinations:
 
 ```matlab
-% Dynamic MPC + LQR
 cfg.controller.lateral = "mpc";
-cfg.controller.longitudinal = "lqr";
+cfg.controller.longitudinal = "pid";
 
-% Kinematic MPC + LQR
+cfg.controller.lateral = "mpc_kinematic";
+cfg.controller.longitudinal = "pid";
+
 cfg.controller.lateral = "mpc_kinematic";
 cfg.controller.longitudinal = "lqr";
 
-% Stanley + PID
-cfg.controller.lateral = "stanley";
-cfg.controller.longitudinal = "pid";
-
-% Combined MPC
 cfg.controller.lateral = "mpc_combined";
-cfg.controller.longitudinal = "lqr";   % ignored by combined MPC
+cfg.controller.longitudinal = "pid";   % ignored by combined MPC
 ```
 
 ## Speed Reference
 
 ```matlab
-% Constant speed
 cfg.speed.mode = "constant";
-cfg.speed.constant_value = 5.0;
+cfg.speed.constant_value = 3.0;
+```
 
-% Profile from MAT file
+or
+
+```matlab
 cfg.speed.mode = "profile";
-cfg.speed.profile_file = fullfile('data', 'reference_velocity', ...
-    'referencePath_Velocity_peak_velocity_7.mat');
+cfg.speed.profile_file = fullfile( ...
+    'data', 'reference_velocity', 'referencePath_Velocity_peak_velocity_5.mat');
 ```
 
 Available example profiles are under `data/reference_velocity/`.
@@ -105,7 +186,7 @@ run/single_run/<timestamp>_<controller_tag>/
 compare_lateral_mpc_variants
 ```
 
-This runs:
+This script compares:
 
 - `mpc + lqr`
 - `mpc_kinematic + lqr`
@@ -116,132 +197,95 @@ Outputs are saved under:
 run/compare_run/<timestamp>_lateral_mpc_compare/
 ```
 
-Each controller has its own subfolder, and the compare folder also contains a comparison summary and comparison figure.
-
-## New Updates in This Version
-
-### 1. Kinematic Bicycle MPC Lateral Controller
-
-New file:
-
-- [controllers/lateral/mpc_kinematic_lateral.m](/f:/Controller_GDP/controllers/lateral/mpc_kinematic_lateral.m)
-
-Key points:
-
-- Uses a 2-state kinematic bicycle error model
-- Uses path curvature preview
-- Supports steering-delay compensation through the same interface as other lateral controllers
-- Can be selected with `cfg.controller.lateral = "mpc_kinematic"`
-
-### 2. Actuator Map Upgraded to 2D Scatter Interpolation
-
-Updated files:
-
-- [model/load_vehicle_params.m](/f:/Controller_GDP/model/load_vehicle_params.m)
-- [model/longitudinal_model.m](/f:/Controller_GDP/model/longitudinal_model.m)
-
-What changed:
-
-- Actuator maps now use `(vel, cmd) -> force` scattered interpolation
-- `Vel_Full` from the `.mat` map files is now loaded and used
-- Force inversion is now done numerically from the 2D map instead of only using a 1D command-force lookup
-- The old 1D arrays are still kept as fallback if 2D evaluation fails
-
-This better matches the measured actuator data and avoids collapsing velocity-dependent map behaviour into a single line.
-
-### 3. ROS2 Bag Import and Plotting
-
-New utilities:
-
-- [utils/read_rosbag_kia.m](/f:/Controller_GDP/utils/read_rosbag_kia.m)
-- [utils/bag_to_ref.m](/f:/Controller_GDP/utils/bag_to_ref.m)
-
-`read_rosbag_kia`:
-
-- Reads a ROS2 bag folder
-- Extracts steering, throttle, brake, odometry, and actual acceleration
-- Normalises and resamples signals
-- Saves processed output to `data/bag_data_10hz.mat`
-- Saves a 2x2 white-background plot for quick inspection
-
-Expected ROS2 bag topics:
-
-- `/steering_feedback`
-- `/brake_pedal_feedback`
-- `/acceleration_feedback`
-- `/ins/odometry`
-
-Example:
+### Broad Sweep
 
 ```matlab
-addpath('utils');
-bag = read_rosbag_kia(fullfile(pwd, 'kianirobag'));
+run_tuning_sweep
 ```
 
-### 4. Simulation vs Bag Plotting
+This is a broader scenario sweep script. It is useful for compliance-style batch runs, but for current `mpc_kinematic + pid` tuning, a narrower custom sweep is usually more effective.
 
-New plotting helper:
+## Current Tuning Guidance
 
-- [plotting/save_sim_vs_bag_plot.m](/f:/Controller_GDP/plotting/save_sim_vs_bag_plot.m)
+The current practical tuning order is:
 
-For runs where `data/bag_data_10hz.mat` exists, the framework now generates:
+1. tune lateral `mpc_kinematic` until steering command is smooth and `peak_cte` is acceptable
+2. lock lateral parameters
+3. tune longitudinal `pid`
 
-- `sim_vs_bag.png`
+### Lateral
 
-The comparison figure is a 2x2 layout:
+Primary parameters:
+
+- `cfg.mpc_kinematic.Q`
+- `cfg.mpc_kinematic.R`
+- `cfg.mpc_kinematic.Rd`
+- `cfg.mpc_kinematic.kappa_ff_gain`
+- `cfg.mpc_kinematic.N`
+
+Interpretation:
+
+- larger `Q` pushes harder on path and heading error
+- larger `R` penalises steering magnitude
+- larger `Rd` penalises steering changes and reduces chatter
+- larger `kappa_ff_gain` increases curvature feedforward aggressiveness
+- larger `N` increases prediction horizon
+
+The fallback gains:
+
+```matlab
+cfg.mpc_kinematic.fallback_k_e_y
+cfg.mpc_kinematic.fallback_k_e_psi
+```
+
+are only used if the QP solve fails and the controller falls back to a simple linear correction law.
+
+### Longitudinal
+
+Primary parameters:
+
+- `cfg.lon_pid.kp`
+- `cfg.lon_pid.ki`
+- `cfg.lon_pid.kd`
+
+Current guidance:
+
+- increase `kp` first
+- add small `ki` only after proportional response is acceptable
+- use `kd` last, if needed
+
+For current tuning work, `peak_lon_dev` is often the key longitudinal metric to reduce once lateral behaviour is already stable.
+
+## Outputs
+
+Each `main` run typically produces:
+
+| File | Description |
+|---|---|
+| `result.mat` | Full simulation result struct |
+| `summary.txt` | Key performance metrics |
+| `path_tracking.png` | Reference path vs actual path |
+| `tracking_errors.png` | Lateral and longitudinal tracking errors |
+| `speed_tracking.png` | Speed and acceleration plots |
+| `lateral_dynamics.png` | Steering and lateral-state plots |
+| `execution_timing.png` | Controller execution timing |
+| `sim_vs_bag.png` | Simulation vs bag comparison, if bag data exists |
+
+## Simulation vs Bag Plot
+
+The current bag comparison figure includes:
 
 - Speed
 - Steering command
 - Throttle
 - Brake
 
-Plot conventions:
+This is useful for quickly checking:
 
-- Bag: red
-- Simulation: green
-
-The plotting logic has also been adjusted to reduce one trace fully covering the other by:
-
-- Interpolating both onto a common time base
-- Drawing simulation first
-- Drawing bag second with stronger visual emphasis
-
-### 5. Run Directory Reorganization
-
-Run outputs are now separated by purpose:
-
-```text
-run/
-  single_run/
-    <timestamp>_<controller_tag>/
-  compare_run/
-    <timestamp>_lateral_mpc_compare/
-```
-
-This keeps normal runs and controller-comparison runs separate.
-
-### 6. Longitudinal Anti-Chatter Shaping
-
-Updated file:
-
-- [controllers/longitudinal/LQR_controller.m](/f:/Controller_GDP/controllers/longitudinal/LQR_controller.m)
-
-Added logic:
-
-- Small acceleration-command deadband
-- Drive/brake/coast switching hysteresis
-- Optional low-pass filtering
-- Optional rate limiting
-
-Important note:
-
-- These protections are now configured to be very mild by default
-- They are only intended to suppress small command chatter near steady-state operation
-- If path tracking degrades, the first place to check is whether longitudinal command shaping is changing the speed dynamics too much for the lateral MPC assumptions
-
-Related tuning lives in:
-
-- [config/default_config.m](/f:/Controller_GDP/config/default_config.m)
+- steering chatter
+- speed tracking bias
+- throttle/brake pulse behaviour
+- overall shape mismatch between simulation and recorded data
 
 ## Project Structure
 
@@ -264,6 +308,7 @@ Controller_GDP/
     longitudinal/
       PID_controller.m
       LQR_controller.m
+      longitudinal_lqr_force_balance_controller.m
 
   model/
     load_vehicle_params.m
@@ -281,6 +326,7 @@ Controller_GDP/
 
   simulation/
     run_closed_loop.m
+    track_errors.m
 
   plotting/
     save_sim_vs_bag_plot.m
@@ -291,7 +337,6 @@ Controller_GDP/
     angle_wrap.m
     nearest_path_ref_point.m
     rate_limit.m
-    track_errors.m
 
   data/
     path_ref.mat
@@ -305,45 +350,7 @@ Controller_GDP/
     compare_run/
 ```
 
-## Output Files
-
-### Single Run
-
-Each `main` run typically produces:
-
-| File | Description |
-|---|---|
-| `result.mat` | Full simulation output |
-| `summary.txt` | Key performance metrics |
-| `path_tracking.png` | Reference path vs actual path |
-| `tracking_errors.png` | Tracking errors over time |
-| `speed_tracking.png` | Speed and acceleration-related plots |
-| `lateral_dynamics.png` | Steering and lateral-state plots |
-| `execution_timing.png` | Controller execution timing |
-| `sim_vs_bag.png` | Simulation vs bag comparison, if bag data exists |
-
-### Compare Run
-
-Each `compare_lateral_mpc_variants` run produces:
-
-- One folder per controller case
-- `comparison.mat`
-- `comparison_summary.txt`
-- `lateral_controller_comparison.png`
-
-## Vehicle and Actuator Model
-
-The simulation plant is a coupled bicycle model with:
-
-- Steering delay
-- Longitudinal delay
-- Tire lateral force model
-- Resistive longitudinal force model
-- Pedal-to-force actuator mapping from measured data
-
-The acceleration and brake maps are now treated as velocity-dependent 2D maps rather than a single 1D curve.
-
-## MATLAB Dependencies
+## Dependencies
 
 - MATLAB R2020b or later recommended
 - Optimization Toolbox for `quadprog`
@@ -351,14 +358,6 @@ The acceleration and brake maps are now treated as velocity-dependent 2D maps ra
 
 ## Notes
 
-- `main` no longer includes the old longitudinal controller comparison interface
-- The previous `cfg.run.compare_longitudinal` and `cfg.run.longitudinal_compare_set` options have been removed
-- Use `compare_lateral_mpc_variants` for the current controller-comparison workflow
-
-## Recommended Workflow
-
-1. Generate or update bag data with `read_rosbag_kia`
-2. Run a single controller case with `main`
-3. Inspect `summary.txt`, run plots, and `sim_vs_bag.png`
-4. Run `compare_lateral_mpc_variants`
-5. Compare `mpc` vs `mpc_kinematic` under the same longitudinal `lqr` controller
+- the README reflects the current code state as of today's tuning/debugging updates
+- the active defaults should always be checked in [config/default_config.m](/f:/Controller_GDP/config/default_config.m)
+- if behaviour and README diverge, trust the code and generated `summary.txt` outputs first

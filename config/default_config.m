@@ -1,8 +1,8 @@
 function cfg = default_config()
     cfg.controller.lateral = "mpc_kinematic";  % "stanley" | "pure_pursuit" | "mpc" | "mpc_kinematic" | "mpc_combined"
-    cfg.controller.longitudinal = "lqr";      % "pid" | "lqr" (ignored when lateral = "mpc_combined")
+    cfg.controller.longitudinal = "pid";      % "pid" | "lqr" | "lqr_force_balance" (ignored when lateral = "mpc_combined")
 
-    cfg.sim.dt = 0.05;
+    cfg.sim.dt = 0.1;
     cfg.sim.T_end = 150;
     cfg.sim.max_travel_time = cfg.sim.T_end;
     cfg.sim.progress_window = 5;
@@ -55,11 +55,11 @@ function cfg = default_config()
     cfg.mpc.max_steer = cfg.vehicle.max_steer;
 
     % Kinematic bicycle MPC lateral only
-    cfg.mpc_kinematic.N = 25;
-    cfg.mpc_kinematic.Q = diag([18, 14]);
+    cfg.mpc_kinematic.N = 24;
+    cfg.mpc_kinematic.Q = diag([2, 2]);
     cfg.mpc_kinematic.R = 4;
-    cfg.mpc_kinematic.Rd = 12.0;
-    cfg.mpc_kinematic.kappa_ff_gain = 1.0;
+    cfg.mpc_kinematic.Rd = 50.0;
+    cfg.mpc_kinematic.kappa_ff_gain = 0.4;
     cfg.mpc_kinematic.max_steer = cfg.vehicle.max_steer;
     cfg.mpc_kinematic.fallback_k_e_y = 0.9;
     cfg.mpc_kinematic.fallback_k_e_psi = 1.4;
@@ -79,17 +79,17 @@ function cfg = default_config()
     cfg.mpc_combined.a_max = cfg.accel_limits.a_max;
 
     % ── PID longitudinal ──────────────────────────────────────────────
-    cfg.lon_pid.kp = 2.5;
-    cfg.lon_pid.ki = 2.0;
-    cfg.lon_pid.kd = 0.08;
+    cfg.lon_pid.kp = 1.2;
+    cfg.lon_pid.ki = 0.01;
+    cfg.lon_pid.kd = 0.0;
     cfg.lon_pid.a_min = cfg.accel_limits.a_min;
     cfg.lon_pid.a_max = cfg.accel_limits.a_max;
     cfg.lon_pid.i_term = 0;
     cfg.lon_pid.prev_ev = 0;
 
     % ── LQR longitudinal ─────────────────────────────────────────────
-    cfg.lon_lqr.Q = diag([20, 10]);
-    cfg.lon_lqr.R = 0.4;
+    cfg.lon_lqr.Q = diag([10, 3]);
+    cfg.lon_lqr.R = 1.5;
     cfg.lon_lqr.a_min = cfg.accel_limits.a_min;
     cfg.lon_lqr.a_max = cfg.accel_limits.a_max;
     cfg.lon_lqr.int_error = 0.0;
@@ -98,13 +98,25 @@ function cfg = default_config()
     cfg.lon_lqr.ev_gate = 0.05;
     cfg.lon_lqr.a_gate = 0.12;
     cfg.lon_lqr.a_deadband = 0.005;
-    cfg.lon_lqr.a_hyst_enter_drive = 0.02;
-    cfg.lon_lqr.a_hyst_exit_drive = 0.008;
-    cfg.lon_lqr.a_hyst_enter_brake = 0.025;
-    cfg.lon_lqr.a_hyst_exit_brake = 0.01;
+    cfg.lon_lqr.a_hyst_enter_drive = 0.05;
+    cfg.lon_lqr.a_hyst_exit_drive = 0.02;
+    cfg.lon_lqr.a_hyst_enter_brake = 0.05;
+    cfg.lon_lqr.a_hyst_exit_brake = 0.02;
     cfg.lon_lqr.cmd_lowpass_tau_s = 0.0;
-    cfg.lon_lqr.a_rate_up_max = 100.0;
-    cfg.lon_lqr.a_rate_down_max = 100.0;
+    cfg.lon_lqr.a_rate_up_max = inf;
+    cfg.lon_lqr.a_rate_down_max = inf;
+
+    % Force-balance LQR longitudinal
+    cfg.lon_lqr_force.Q = diag([120, 8]);
+    cfg.lon_lqr_force.R = 2e-6;
+    cfg.lon_lqr_force.a_min = cfg.accel_limits.a_min;
+    cfg.lon_lqr_force.a_max = cfg.accel_limits.a_max;
+    cfg.lon_lqr_force.int_error = 0.0;
+    cfg.lon_lqr_force.prev_F_cmd = 0.0;
+    cfg.lon_lqr_force.prev_a_des = 0.0;
+    cfg.lon_lqr_force.last_v_lin = 0.0;
+    cfg.lon_lqr_force.last_delta_F = 0.0;
+    cfg.lon_lqr_force.v_lin_min = 0.5;
 
     % ── Run settings ──────────────────────────────────────────────────
     cfg.run.root_dir = 'run';

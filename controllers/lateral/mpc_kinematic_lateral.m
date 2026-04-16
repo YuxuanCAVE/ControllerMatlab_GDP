@@ -86,7 +86,6 @@ function delta = mpc_kinematic_lateral(state, ref, veh, dt, p, idx_hint, window,
 
     delta_ff0 = p.kappa_ff_gain * atan(L * kappa0);
     delta_prev_corr = state.delta - delta_ff0;
-
     if n_delay > 0
         for d = 1:n_delay
             u_pending_corr = steer_buffer(d) - delta_ff_horizon(d);
@@ -122,15 +121,18 @@ function delta = mpc_kinematic_lateral(state, ref, veh, dt, p, idx_hint, window,
         Sd(row, :) = d_sum;
     end
 
+    x_free = Sx * x0 + Sd;
+
     D = eye(N);
     D = D - [zeros(1, N); eye(N-1, N)];
     d0 = zeros(N, 1);
     d0(1) = delta_prev_corr;
 
-    x_free = Sx * x0 + Sd;
+    % Cost function: J = X'QX + U'RU + Rd * dU'dU
 
     H = Su' * Qbar * Su + Rbar + p.Rd * (D' * D);
     H = 0.5 * (H + H');
+    
     f = Su' * Qbar * x_free - p.Rd * (D' * d0);
 
     lb = -p.max_steer * ones(N, 1) - delta_ff_pred;

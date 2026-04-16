@@ -45,6 +45,7 @@ function veh = load_vehicle_params(accel_map_file, brake_map_file)
     acc_cmd_sorted = acc_cmd(i1);
 
     veh.acc.acc_full = acc_cmd_sorted;
+    veh.acc.cmd_full = acc_cmd_sorted;
     veh.acc.force_full = acc_force_sorted;
 
     Sbrk = load(brake_map_file);
@@ -70,6 +71,7 @@ function veh = load_vehicle_params(accel_map_file, brake_map_file)
     brk_force_sorted = brk_force_mag(i2);
 
     veh.brk.brake_full = brk_cmd_sorted;
+    veh.brk.cmd_full = brk_cmd_sorted;
     veh.brk.force_full = brk_force_sorted;
 
     veh.max_pedal_publish = 0.60;
