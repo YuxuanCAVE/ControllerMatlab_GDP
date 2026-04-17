@@ -1,0 +1,26 @@
+Controller: MPC_KINEMATIC + PID | plant=DYNAMIC
+
+LATERAL:
+  RMS CTE            : 0.1689 m
+  Peak CTE           : 0.7216 m
+  RMS heading error  : 2.262 deg
+  REQ-1 (<0.6m)      : FAIL
+
+LONGITUDINAL:
+  RMS speed error    : 0.3047 m/s
+  Peak speed error   : 1.5408 m/s
+  Peak lon deviation : 6.9218 m
+  RMS lon deviation  : 5.1500 m
+  REQ-1 (<0.8m)      : FAIL
+
+TIMING:
+  Control loop       : 0.100 s (10 Hz)
+  Mean exec time     : 0.000635 s (0.635 ms)
+  Max exec time      : 0.001859 s (1.859 ms)
+  Real-time OK       : YES
+
+GENERAL:
+  Loop time          : 52.80 s
+  Goal reached       : 1
+  Termination        : goal_reached
+  Run directory      : /home/yuxuan/Controller_MATLAB_GDP/run/single_run/20260417_103541_mpc_kinematic_pid_dynamic

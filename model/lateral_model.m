@@ -1,40 +1,45 @@
-% Main lateral plant wrapper used by the project.
-% Supported plant choices:
-%   1) dynamic        -> nonlinear tire-force model
-%   2) bicycle_linear -> linear bicycle tire-force model
+% Main lateral plant used by the project.
+% This is a single kinematic bicycle model updated at the rear axle.
 %
 % Input:
-%   state, delta_cmd, lon_model, dt, veh, cfg
+%   state, delta_cmd, lon_model, dt, veh
 %
 % Output:
 %   updated state, longitudinal acceleration ax, and lateral debug struct
-function [state, ax, lat] = lateral_model(state, delta_cmd, lon_model, dt, veh, cfg)
-    vx = get_vx(state);
+function [state, ax, lat] = lateral_model(state, delta_cmd, lon_model, dt, veh)
+    vx = max(get_vx(state), 0.0);
+    yaw = state.yaw;
+    L = veh.L;
 
-    lateral_model_type = "dynamic";
-    if nargin >= 6 && isfield(cfg, 'plant') && isfield(cfg.plant, 'lateral_model')
-        lateral_model_type = string(cfg.plant.lateral_model);
-    end
+    ax = lon_model.a_actual;
+    vx_next = max(0.0, vx + ax * dt);
+    vx_mid = 0.5 * (vx + vx_next);
 
-    switch lateral_model_type
-        case "bicycle_linear"
-            lat_force = bicycle_linear_lateral_tire_model(vx, state.vy, state.r, delta_cmd, veh);
-        otherwise
-            lat_force = lateral_tire_model(vx, state.vy, state.r, delta_cmd, veh);
-    end
+    yaw_rate = vx_mid / max(L, 1e-6) * tan(delta_cmd);
+    yaw_next = angle_wrap(yaw + yaw_rate * dt);
 
-    [state, dbg] = coupled_bicycle_dynamics(state, delta_cmd, lon_model, lat_force, veh, dt);
+    x_dot = vx_mid * cos(yaw);
+    y_dot = vx_mid * sin(yaw);
 
-    ax = dbg.ax;
-    lat.vx = get_vx(state);
-    lat.vy = state.vy;
-    lat.r = state.r;
-    lat.beta = state.beta;
-    lat.ay = dbg.ay;
-    lat.alpha_f = dbg.alpha_f;
-    lat.alpha_r = dbg.alpha_r;
-    lat.Fy_f = dbg.Fy_f;
-    lat.Fy_r = dbg.Fy_r;
+    state.x = state.x + x_dot * dt;
+    state.y = state.y + y_dot * dt;
+    state.yaw = yaw_next;
+    state.v = vx_next;
+    state.vx = vx_next;
+    state.vy = 0.0;
+    state.r = yaw_rate;
+    state.beta = 0.0;
+    state.delta = delta_cmd;
+
+    lat.vx = vx_next;
+    lat.vy = 0.0;
+    lat.r = yaw_rate;
+    lat.beta = 0.0;
+    lat.ay = vx_mid * yaw_rate;
+    lat.alpha_f = 0.0;
+    lat.alpha_r = 0.0;
+    lat.Fy_f = 0.0;
+    lat.Fy_r = 0.0;
 end
 
 function vx = get_vx(state)
@@ -43,43 +48,4 @@ function vx = get_vx(state)
     else
         vx = state.v;
     end
-end
-
-function lat_force = bicycle_linear_lateral_tire_model(vx, vy, r, delta_cmd, veh)
-    vx = max(vx, 0.5);
-
-    alpha_f = atan2(vy + veh.lf * r, vx) - delta_cmd;
-    alpha_r = atan2(vy - veh.lr * r, vx);
-
-    Fy_f = -veh.tire.front.Calpha * alpha_f;
-    Fy_r = -veh.tire.rear.Calpha * alpha_r;
-
-    % Low-speed fade-in to avoid overly aggressive yaw response near standstill.
-    low_speed_force_scale = smoothstep_local(vx, 0.5, 2.0);
-    Fy_f = low_speed_force_scale * Fy_f;
-    Fy_r = low_speed_force_scale * Fy_r;
-
-    % Keep the linear model comparable to the nonlinear plant by enforcing
-    % the same peak lateral-force ceilings.
-    Fy_f = min(max(Fy_f, -veh.tire.front.D), veh.tire.front.D);
-    Fy_r = min(max(Fy_r, -veh.tire.rear.D), veh.tire.rear.D);
-
-    lat_force.alpha_f = alpha_f;
-    lat_force.alpha_r = alpha_r;
-    lat_force.Fy_f = Fy_f;
-    lat_force.Fy_r = Fy_r;
-end
-
-function y = smoothstep_local(x, x0, x1)
-    if x <= x0
-        y = 0.0;
-        return;
-    end
-    if x >= x1
-        y = 1.0;
-        return;
-    end
-
-    t = (x - x0) / (x1 - x0);
-    y = t * t * (3.0 - 2.0 * t);
 end

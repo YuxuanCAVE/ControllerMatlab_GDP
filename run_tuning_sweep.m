@@ -1,5 +1,5 @@
 %% run_tuning_sweep.m
-%  GDP sweep: 7 controller combos x 7 speeds = 49 cases.
+%  GDP sweep for the retained lateral controller family.
 %  Acceleration limits derived from actuator .mat files.
 %
 %  Usage:  run_tuning_sweep          % run all
@@ -31,18 +31,11 @@ function run_tuning_sweep(dry_run)
     a_min_map = veh.a_min_from_map;
     cfg_base.lon_pid.a_max = a_max_map; cfg_base.lon_pid.a_min = a_min_map;
     cfg_base.lon_lqr.a_max = a_max_map; cfg_base.lon_lqr.a_min = a_min_map;
-    cfg_base.mpc_combined.a_max = a_max_map; cfg_base.mpc_combined.a_min = a_min_map;
 
-    % --- Controller combos: only MPC-based ones are active ---
-    % The following four entries (Stanley and Pure Pursuit) are commented out.
     combos = {
-        % struct('lateral',"stanley",'lon',"pid",'label',"stanley+pid");
-        % struct('lateral',"stanley",'lon',"lqr",'label',"stanley+lqr");
-        % struct('lateral',"pure_pursuit",'lon',"pid",'label',"pp+pid");
-        % struct('lateral',"pure_pursuit",'lon',"lqr",'label',"pp+lqr");
-        struct('lateral',"mpc",'lon',"pid",'label',"mpc+pid");
-        struct('lateral',"mpc",'lon',"lqr",'label',"mpc+lqr");
-        struct('lateral',"mpc_combined",'lon',"none",'label',"mpc_combined");
+        struct('lateral',"mpc_kinematic",'lon',"pid",'label',"mpc_kinematic+pid");
+        struct('lateral',"mpc_kinematic",'lon',"lqr",'label',"mpc_kinematic+lqr");
+        struct('lateral',"mpc_kinematic",'lon',"lqr_force_balance",'label',"mpc_kinematic+lqr_force");
     };
 
     speed_conditions = {};

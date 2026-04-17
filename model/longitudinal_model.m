@@ -117,10 +117,14 @@ function [lon_force, lon] = longitudinal_model(vx, a_des, veh, lon)
     lon_force.branch_brake = branch_brake;
     lon_force.branch_coast = branch_coast;
     lon_force.F_branch_eps = F_branch_eps;
+
+
+
+
 end
 
 function force = eval_force_map_1d(cmd, map)
-    if cmd < map.cmd_min_effective
+    if cmd <= 0
         force = 0;
         return;
     end
@@ -128,10 +132,7 @@ function force = eval_force_map_1d(cmd, map)
     cmd_q = min(max(cmd, map.cmd_min_effective), map.cmd_max);
 
     try
-        [cmd_axis, idx] = sort(map.cmd_full);
-        force_axis = map.force_full(idx);
-        [cmd_axis, iu] = unique(cmd_axis, 'stable');
-        force_axis = force_axis(iu);
+        [cmd_axis, force_axis] = get_lookup_axes(map);
 
         if numel(cmd_axis) < 2
             force = NaN;
@@ -145,21 +146,21 @@ function force = eval_force_map_1d(cmd, map)
 end
 
 function cmd = invert_force_map_1d(force_target, map)
+
+
+
     cmd_lo = map.cmd_min_effective;
     cmd_hi = map.cmd_max;
 
     try
-        [force_axis, idx] = sort(map.force_full);
-        cmd_axis = map.cmd_full(idx);
-        [force_axis, iu] = unique(force_axis, 'stable');
-        cmd_axis = cmd_axis(iu);
+        [cmd_axis, force_axis] = get_lookup_axes(map);
 
-        if numel(force_axis) < 2
+        if numel(cmd_axis) < 2
             cmd = NaN;
             return;
         end
 
-        if force_target < map.force_min_effective
+        if force_target <= 0
             cmd = 0;
             return;
         end
@@ -169,6 +170,19 @@ function cmd = invert_force_map_1d(force_target, map)
     catch
         cmd = NaN;
     end
+end
+
+function [cmd_axis, force_axis] = get_lookup_axes(map)
+    if isfield(map, 'cmd_lookup') && isfield(map, 'force_lookup')
+        cmd_axis = map.cmd_lookup(:);
+        force_axis = map.force_lookup(:);
+        return;
+    end
+
+    [cmd_axis, idx] = sort(map.cmd_full);
+    force_axis = map.force_full(idx);
+    [cmd_axis, iu] = unique(cmd_axis, 'stable');
+    force_axis = force_axis(iu);
 end
 
 function lon = ensure_actuator_state(lon)
@@ -181,9 +195,10 @@ function lon = ensure_actuator_state(lon)
 end
 
 function lon = update_actuator_mode(F_required, lon, veh)
-    drive_enter = veh.acc.force_min_effective;
+    mode_enter_eps = 1e-6;
+    drive_enter = max(veh.acc.force_min_effective, mode_enter_eps);
     drive_exit = veh.acc.force_exit_coast;
-    brake_enter = veh.brk.force_min_effective;
+    brake_enter = max(veh.brk.force_min_effective, mode_enter_eps);
     brake_exit = veh.brk.force_exit_coast;
 
     switch lon.actuator_mode

@@ -20,31 +20,19 @@ function result = run_closed_loop(cfg, ref, veh)
     state.delta = 0.0;
     state.z_lon = 0.0;
 
-    use_combined_mpc = (cfg.controller.lateral == "mpc_combined");
-    use_fake_lateral = (~use_combined_mpc && cfg.controller.lateral == "fake_controller");
-    use_fake_longitudinal = (~use_combined_mpc && cfg.controller.longitudinal == "fake_controller");
+    use_fake_lateral = (cfg.controller.lateral == "fake_controller");
+    use_fake_longitudinal = (cfg.controller.longitudinal == "fake_controller");
 
-    if ~use_combined_mpc
-        switch cfg.controller.longitudinal
-            case "pid", lon = cfg.lon_pid;
-            case "lqr", lon = cfg.lon_lqr;
-            case "lqr_force_balance", lon = cfg.lon_lqr_force;
-            case "fake_controller", lon = struct();
-            otherwise, error('Unknown longitudinal controller: %s', cfg.controller.longitudinal);
-        end
-    else
-        lon = struct();
+    switch cfg.controller.longitudinal
+        case "pid", lon = cfg.lon_pid;
+        case "lqr", lon = cfg.lon_lqr;
+        case "lqr_force_balance", lon = cfg.lon_lqr_force;
+        case "fake_controller", lon = struct();
+        otherwise, error('Unknown longitudinal controller: %s', cfg.controller.longitudinal);
     end
 
-    if use_combined_mpc
-        ctrl_period = max(1, round(cfg.mpc_combined.dt_ctrl / dt));
-        ctrl_dt = cfg.mpc_combined.dt_ctrl;
-        last_delta_cmd = 0;
-        last_a_des_cmd = 0;
-    else
-        ctrl_period = 1;
-        ctrl_dt = dt;
-    end
+    ctrl_period = 1;
+    ctrl_dt = dt;
 
     idx_progress = 1;
     steer_delay_buffer = state.delta * ones(steer_delay_steps + 1, 1);
@@ -136,49 +124,33 @@ function result = run_closed_loop(cfg, ref, veh)
 
         ctrl_tic = tic;
 
-        if use_combined_mpc
-            if compute_ctrl
-                [delta_cmd, a_des_raw] = mpc_combined(state, ref, veh, dt, ...
-                    cfg.mpc_combined, idx_progress, cfg.sim.progress_window, ...
-                    steer_delay_buffer, lon_delay_buffer);
-                last_delta_cmd = delta_cmd;
-                last_a_des_cmd = a_des_raw;
-            else
-                delta_cmd = last_delta_cmd;
-                a_des_raw = last_a_des_cmd;
-            end
-        else
-            switch cfg.controller.lateral
-                case "stanley"
-                    delta_cmd = stanley_lateral(state.x, state.y, state.yaw, state.v, ...
-                        ref, veh.L, cfg.stanley, idx_progress, cfg.sim.progress_window);
-                case "pure_pursuit"
-                    delta_cmd = pure_pursuit_lateral(state.x, state.y, state.yaw, state.v, ...
-                        ref, veh.L, cfg.pure_pursuit, idx_progress, cfg.sim.progress_window);
-                case "mpc"
-                    delta_cmd = mpc_lateral(state, ref, veh, dt, cfg.mpc, ...
-                        idx_progress, cfg.sim.progress_window, steer_delay_buffer);
-                case "mpc_kinematic"
-                    delta_cmd = mpc_kinematic_lateral(state, ref, veh, dt, cfg.mpc_kinematic, ...
-                        idx_progress, cfg.sim.progress_window, steer_delay_buffer);
-                case "fake_controller"
-                    delta_cmd = 0.0;
-                otherwise
-                    error('Unknown lateral controller: %s', cfg.controller.lateral);
-            end
+        switch cfg.controller.lateral
+            case "stanley"
+                delta_cmd = stanley_lateral(state.x, state.y, state.yaw, state.v, ...
+                    ref, veh.L, cfg.stanley, idx_progress, cfg.sim.progress_window);
+            case "pure_pursuit"
+                delta_cmd = pure_pursuit_lateral(state.x, state.y, state.yaw, state.v, ...
+                    ref, veh.L, cfg.pure_pursuit, idx_progress, cfg.sim.progress_window);
+            case "mpc_kinematic"
+                delta_cmd = mpc_kinematic_lateral(state, ref, veh, dt, cfg.mpc_kinematic, ...
+                    idx_progress, cfg.sim.progress_window, steer_delay_buffer);
+            case "fake_controller"
+                delta_cmd = 0.0;
+            otherwise
+                error('Unknown lateral controller: %s', cfg.controller.lateral);
+        end
 
-            switch cfg.controller.longitudinal
-                case "pid"
-                    [a_des_raw, lon] = PID_controller(v_ref_now, state.v, lon, dt);
-                case "lqr"
-                    [a_des_raw, lon] = LQR_controller(v_ref_now, state.v, lon, dt);
-                case "lqr_force_balance"
-                    [a_des_raw, lon] = longitudinal_lqr_force_balance_controller(v_ref_now, state.v, lon, dt, veh);
-                case "fake_controller"
-                    a_des_raw = 0.0;
-                otherwise
-                    error('Unknown longitudinal controller: %s', cfg.controller.longitudinal);
-            end
+        switch cfg.controller.longitudinal
+            case "pid"
+                [a_des_raw, lon] = PID_controller(v_ref_now, state.v, lon, dt);
+            case "lqr"
+                [a_des_raw, lon] = LQR_controller(v_ref_now, state.v, lon, dt);
+            case "lqr_force_balance"
+                [a_des_raw, lon] = longitudinal_lqr_force_balance_controller(v_ref_now, state.v, lon, dt, veh);
+            case "fake_controller"
+                a_des_raw = 0.0;
+            otherwise
+                error('Unknown longitudinal controller: %s', cfg.controller.longitudinal);
         end
 
         ctrl_exec_time = toc(ctrl_tic);
@@ -200,7 +172,7 @@ function result = run_closed_loop(cfg, ref, veh)
             [state, ax_actual, lat, idx_progress] = fake_lateral_step( ...
                 state, lon_model, dt, veh, ref, idx_progress, cfg.sim.progress_window);
         else
-            [state, ax_actual, lat] = lateral_model(state, delta_cmd_exec, lon_model, dt, veh, cfg);
+            [state, ax_actual, lat] = lateral_model(state, delta_cmd_exec, lon_model, dt, veh);
         end
 
         if use_fake_longitudinal
@@ -285,20 +257,11 @@ function result = run_closed_loop(cfg, ref, veh)
     result.metrics.peak_lon_dev = max(abs(lon_dev));
     result.metrics.rms_lon_dev = sqrt(mean(lon_dev.^2));
 
-    if use_combined_mpc
-        result.metrics.longitudinal_controller = "mpc_combined";
-        result.metrics.controller = "mpc_combined";
-    else
-        result.metrics.longitudinal_controller = cfg.controller.longitudinal;
-        result.metrics.controller = sprintf('%s + %s', ...
-            char(cfg.controller.lateral), char(cfg.controller.longitudinal));
-    end
+    result.metrics.longitudinal_controller = cfg.controller.longitudinal;
+    result.metrics.controller = sprintf('%s + %s', ...
+        char(cfg.controller.lateral), char(cfg.controller.longitudinal));
 
-    if use_combined_mpc
-        compute_mask = mod((0:stop_idx-1)', ctrl_period) == 0;
-    else
-        compute_mask = true(stop_idx, 1);
-    end
+    compute_mask = true(stop_idx, 1);
     ctrl_times = log.ctrl_exec_time_s(compute_mask);
     result.metrics.ctrl_loop_dt = ctrl_dt;
     result.metrics.ctrl_freq_hz = 1 / ctrl_dt;

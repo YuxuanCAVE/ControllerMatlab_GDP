@@ -1,0 +1,26 @@
+Controller: FAKE_CONTROLLER + PID | plant=BICYCLE_LINEAR
+
+LATERAL:
+  RMS CTE            : 0.0000 m
+  Peak CTE           : 0.0000 m
+  RMS heading error  : 0.000 deg
+  REQ-1 (<0.6m)      : PASS
+
+LONGITUDINAL:
+  RMS speed error    : 0.1061 m/s
+  Peak speed error   : 1.4091 m/s
+  Peak lon deviation : 1.3191 m
+  RMS lon deviation  : 1.3137 m
+  REQ-1 (<0.8m)      : FAIL
+
+TIMING:
+  Control loop       : 0.100 s (10 Hz)
+  Mean exec time     : 0.000002 s (0.002 ms)
+  Max exec time      : 0.000746 s (0.746 ms)
+  Real-time OK       : YES
+
+GENERAL:
+  Loop time          : 119.70 s
+  Goal reached       : 1
+  Termination        : goal_reached
+  Run directory      : /home/yuxuan/Controller_MATLAB_GDP/run/single_run/20260417_170200_fake_controller_pid_bicycle_linear

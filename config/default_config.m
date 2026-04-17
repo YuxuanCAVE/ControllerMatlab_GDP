@@ -1,7 +1,6 @@
 function cfg = default_config()
-    cfg.controller.lateral = "mpc_kinematic";  % "stanley" | "pure_pursuit" | "mpc" | "mpc_kinematic" | "mpc_combined" | "fake_controller"
-    cfg.controller.longitudinal = "pid";      % "pid" | "lqr" | "lqr_force_balance" | "fake_controller" (ignored when lateral = "mpc_combined")
-    cfg.plant.lateral_model = "dynamic";        % "dynamic" | "bicycle_linear"
+    cfg.controller.lateral = "mpc_kinematic";  % "stanley" | "pure_pursuit" | "mpc_kinematic" | "fake_controller"
+    cfg.controller.longitudinal = "pid";      % "pid" | "lqr" | "lqr_force_balance" | "fake_controller"
 
     cfg.sim.dt = 0.1;
     cfg.sim.T_end = 150;
@@ -48,14 +47,6 @@ function cfg = default_config()
     cfg.pure_pursuit.k_pp = 1.0;
     cfg.pure_pursuit.delta_ff_gain = 0.8;
 
-    % ── MPC lateral only ──────────────────────────────────────────────
-    cfg.mpc.N = 25;
-    cfg.mpc.Q = diag([15, 12, 8, 10]);
-    cfg.mpc.R = 5;
-    cfg.mpc.Rd = 15.0;
-    cfg.mpc.kappa_ff_gain = 0.5;
-    cfg.mpc.max_steer = cfg.vehicle.max_steer;
-
     % Kinematic bicycle MPC lateral only
     cfg.mpc_kinematic.N = 16;
     cfg.mpc_kinematic.Q = diag([2.2, 0.8]);
@@ -65,20 +56,6 @@ function cfg = default_config()
     cfg.mpc_kinematic.max_steer = cfg.vehicle.max_steer;
     cfg.mpc_kinematic.fallback_k_e_y = 0.9;
     cfg.mpc_kinematic.fallback_k_e_psi = 1.4;
-
-    % ── Combined MPC (lateral + longitudinal) ─────────────────────────
-    % Runs at 10 Hz (drive-by-wire limit)
-    % State: [ey, epsi, vy, r, ev, z_lon]  (6 states)
-    % Input: [delta, a_des]                 (2 inputs)
-    cfg.mpc_combined.N = 25;
-    cfg.mpc_combined.dt_ctrl = 0.10;     % 10 Hz controller rate
-    cfg.mpc_combined.Q = diag([15, 12, 8, 10, 8, 20]);
-    cfg.mpc_combined.R = diag([5, 0.5]);
-    cfg.mpc_combined.Rd = diag([15, 2.0]);
-    cfg.mpc_combined.kappa_ff_gain = 0.5;
-    cfg.mpc_combined.max_steer = cfg.vehicle.max_steer;
-    cfg.mpc_combined.a_min = cfg.accel_limits.a_min;
-    cfg.mpc_combined.a_max = cfg.accel_limits.a_max;
 
     % ── PID longitudinal ──────────────────────────────────────────────
     cfg.lon_pid.kp = 1.6;

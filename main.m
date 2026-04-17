@@ -19,17 +19,10 @@ veh = load_vehicle_params(cfg.vehicle.accel_map_file, cfg.vehicle.brake_map_file
 veh.max_steer = cfg.vehicle.max_steer;
 veh.max_steer_rate = cfg.vehicle.max_steer_rate;
 
-use_combined = (cfg.controller.lateral == "mpc_combined");
-plant_tag = char(cfg.plant.lateral_model);
-if use_combined
-    ctrl_name = sprintf('MPC Combined | plant=%s', upper(plant_tag));
-    ctrl_tag = sprintf('mpc_combined_%s', plant_tag);
-else
-    ctrl_name = sprintf('%s + %s | plant=%s', upper(char(cfg.controller.lateral)), ...
-                                   upper(char(cfg.controller.longitudinal)), upper(plant_tag));
-    ctrl_tag = sprintf('%s_%s_%s', char(cfg.controller.lateral), ...
-                                char(cfg.controller.longitudinal), plant_tag);
-end
+ctrl_name = sprintf('%s + %s', upper(char(cfg.controller.lateral)), ...
+                               upper(char(cfg.controller.longitudinal)));
+ctrl_tag = sprintf('%s_%s', char(cfg.controller.lateral), ...
+                          char(cfg.controller.longitudinal));
 
 if cfg.speed.mode == "constant"
     speed_info = sprintf('Constant %.1f m/s', cfg.speed.constant_value);
