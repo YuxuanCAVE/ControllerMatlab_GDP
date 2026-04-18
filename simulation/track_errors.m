@@ -6,9 +6,9 @@ function [idx, e_ct, e_psi] = track_errors(x, y, yaw, ref, idx_hint, window)
         window = [];
     end
 
-    [idx, ~, ~, psi_ref, ey_proj] = nearest_path_ref_point( ...
+    [idx, xr, yr, psi_ref] = nearest_path_ref_point( ...
         x, y, ref.x, ref.y, idx_hint, window);
 
-    e_ct = ey_proj;
+    e_ct = -sin(psi_ref) * (x - xr) + cos(psi_ref) * (y - yr);
     e_psi = angle_wrap(yaw - psi_ref);
 end

@@ -9,10 +9,7 @@ function result = run_closed_loop(cfg, ref, veh)
     steer_delay_steps = max(round(cfg.vehicle.delay.steer_s / dt), 0);
     lon_delay_steps = max(round(cfg.vehicle.delay.longitudinal_s / dt), 0);
 
-    state.x = ref.x(1);
-    state.y = ref.y(1);
-    state.yaw = ref.yaw(1);
-    state.v = 0.5;
+    [state, idx_progress] = initialize_state_from_config(cfg, ref);
     state.vx = state.v;
     state.vy = 0.0;
     state.r = 0.0;
@@ -34,7 +31,6 @@ function result = run_closed_loop(cfg, ref, veh)
     ctrl_period = 1;
     ctrl_dt = dt;
 
-    idx_progress = 1;
     steer_delay_buffer = state.delta * ones(steer_delay_steps + 1, 1);
     lon_delay_buffer = zeros(lon_delay_steps + 1, 1);
 
@@ -44,7 +40,7 @@ function result = run_closed_loop(cfg, ref, veh)
     % to leave headroom for the feedback controller.
     a_max_ref = cfg.accel_limits.a_max * 0.85;  % e.g. 3.372 * 0.85 = 2.87
     a_min_ref = cfg.accel_limits.a_min * 0.85;  % e.g. -7.357 * 0.85 = -6.25
-    v_ref_smooth = 0.5;  % start from initial vehicle speed
+    v_ref_smooth = state.v;  % start from configured initial vehicle speed
 
     % Preallocate logs
     log.t = zeros(Nsim, 1);
@@ -131,9 +127,12 @@ function result = run_closed_loop(cfg, ref, veh)
             case "pure_pursuit"
                 delta_cmd = pure_pursuit_lateral(state.x, state.y, state.yaw, state.v, ...
                     ref, veh.L, cfg.pure_pursuit, idx_progress, cfg.sim.progress_window);
-            case "mpc_kinematic"
-                delta_cmd = mpc_kinematic_lateral(state, ref, veh, dt, cfg.mpc_kinematic, ...
+            case "mpc_kbm"
+                delta_cmd = mpc_kbm_lateral(state, ref, veh, dt, cfg.mpc_kinematic, ...
                     idx_progress, cfg.sim.progress_window, steer_delay_buffer);
+            case "nmpc_kbm"
+                [delta_cmd, ~] = nmpc_kbm_lateral(state, ref, veh, dt, cfg.nmpc_kbm, ...
+                    idx_progress, cfg.sim.progress_window);
             case "fake_controller"
                 delta_cmd = 0.0;
             otherwise
@@ -172,7 +171,7 @@ function result = run_closed_loop(cfg, ref, veh)
             [state, ax_actual, lat, idx_progress] = fake_lateral_step( ...
                 state, lon_model, dt, veh, ref, idx_progress, cfg.sim.progress_window);
         else
-            [state, ax_actual, lat] = lateral_model(state, delta_cmd_exec, lon_model, dt, veh);
+            [state, ax_actual, lat] = kbm_plant(state, delta_cmd_exec, lon_model, dt, veh);
         end
 
         if use_fake_longitudinal
@@ -271,15 +270,54 @@ function result = run_closed_loop(cfg, ref, veh)
     result.metrics.ctrl_realtime_ok = (max(ctrl_times) < ctrl_dt);
 end
 
+function [state, idx_anchor] = initialize_state_from_config(cfg, ref)
+    n_ref = numel(ref.x);
+    idx_anchor = 1;
+
+    if isfield(cfg, 'init') && isfield(cfg.init, 'path_index') && ~isempty(cfg.init.path_index)
+        idx_anchor = round(cfg.init.path_index);
+    end
+    idx_anchor = min(max(idx_anchor, 1), n_ref);
+
+    x_ref = ref.x(idx_anchor);
+    y_ref = ref.y(idx_anchor);
+    yaw_ref = ref.yaw(idx_anchor);
+
+    ex0 = 0.0;
+    ey0 = 0.0;
+    yaw_offset = 0.0;
+    v0 = 0.5;
+
+    if isfield(cfg, 'init')
+        if isfield(cfg.init, 'ex0_m') && ~isempty(cfg.init.ex0_m)
+            ex0 = cfg.init.ex0_m;
+        end
+        if isfield(cfg.init, 'ey0_m') && ~isempty(cfg.init.ey0_m)
+            ey0 = cfg.init.ey0_m;
+        end
+        if isfield(cfg.init, 'yaw_offset_deg') && ~isempty(cfg.init.yaw_offset_deg)
+            yaw_offset = deg2rad(cfg.init.yaw_offset_deg);
+        end
+        if isfield(cfg.init, 'v0_mps') && ~isempty(cfg.init.v0_mps)
+            v0 = cfg.init.v0_mps;
+        end
+    end
+
+    state.x = x_ref + ex0 * cos(yaw_ref) - ey0 * sin(yaw_ref);
+    state.y = y_ref + ex0 * sin(yaw_ref) + ey0 * cos(yaw_ref);
+    state.yaw = angle_wrap(yaw_ref + yaw_offset);
+    state.v = max(v0, 0.0);
+end
+
 function [state_next, ax, lat, idx_progress] = fake_lateral_step(state, lon_force, dt, veh, ref, idx_hint, window)
     v_curr = max(state.v, 0.0);
     ax = lon_force.a_actual;
     v_next = max(0.0, v_curr + ax * dt);
     ds = max(0.0, 0.5 * (v_curr + v_next) * dt);
 
-    [~, ~, ~, ~, ~, seg_idx, seg_t] = nearest_path_ref_point( ...
+    idx_nearest = nearest_path_ref_point( ...
         state.x, state.y, ref.x, ref.y, idx_hint, window);
-    [x_next, y_next, yaw_next, idx_progress] = advance_along_reference(ref, seg_idx, seg_t, ds);
+    [x_next, y_next, yaw_next, idx_progress] = advance_along_reference(ref, idx_nearest, ds);
 
     state_next = state;
     state_next.x = x_next;
@@ -303,7 +341,7 @@ function [state_next, ax, lat, idx_progress] = fake_lateral_step(state, lon_forc
     lat.Fy_r = 0.0;
 end
 
-function [x, y, yaw, idx_out] = advance_along_reference(ref, seg_idx, seg_t, ds)
+function [x, y, yaw, idx_out] = advance_along_reference(ref, idx_start, ds)
     n = numel(ref.x);
     if n < 2
         x = ref.x(1);
@@ -313,14 +351,10 @@ function [x, y, yaw, idx_out] = advance_along_reference(ref, seg_idx, seg_t, ds)
         return;
     end
 
-    if isnan(seg_idx) || seg_idx < 1
-        seg_idx = 1;
+    if isnan(idx_start) || idx_start < 1
+        idx_start = 1;
     end
-    seg_idx = min(seg_idx, n - 1);
-    seg_t = min(max(seg_t, 0.0), 1.0);
-
-    idx = seg_idx;
-    t = seg_t;
+    idx = min(idx_start, n);
     remaining = ds;
 
     while idx < n
@@ -332,23 +366,20 @@ function [x, y, yaw, idx_out] = advance_along_reference(ref, seg_idx, seg_t, ds)
 
         if seg_len < 1e-9
             idx = idx + 1;
-            t = 0.0;
             continue;
         end
 
-        seg_remaining = (1.0 - t) * seg_len;
-        if remaining <= seg_remaining
-            t = t + remaining / seg_len;
-            x = Ax + t * (Bx - Ax);
-            y = Ay + t * (By - Ay);
+        if remaining <= seg_len
+            ratio = remaining / seg_len;
+            x = Ax + ratio * (Bx - Ax);
+            y = Ay + ratio * (By - Ay);
             yaw = atan2(By - Ay, Bx - Ax);
             idx_out = idx;
             return;
         end
 
-        remaining = remaining - seg_remaining;
+        remaining = remaining - seg_len;
         idx = idx + 1;
-        t = 0.0;
     end
 
     x = ref.x(end);

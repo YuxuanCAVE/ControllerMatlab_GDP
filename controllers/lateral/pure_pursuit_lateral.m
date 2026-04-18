@@ -6,7 +6,7 @@ function delta = pure_pursuit_lateral(x, y, yaw, v, ref, L, p, idx_hint, window)
         window = [];
     end
 
-    [idx0, ~, ~, ~, ~] = nearest_path_ref_point(x, y, ref.x, ref.y, idx_hint, window);
+    idx0 = nearest_path_ref_point(x, y, ref.x, ref.y, idx_hint, window);
 
     Ld = p.Ld_min + p.Ld_gain * max(v, 0);
     Ld = min(max(Ld, p.Ld_min), p.Ld_max);

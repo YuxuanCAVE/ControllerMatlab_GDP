@@ -1,0 +1,26 @@
+Controller: MPC_KBM + PID
+
+LATERAL:
+  RMS CTE            : 0.1101 m
+  Peak CTE           : 0.4001 m
+  RMS heading error  : 2.515 deg
+  REQ-1 (<0.6m)      : PASS
+
+LONGITUDINAL:
+  RMS speed error    : 0.0975 m/s
+  Peak speed error   : 1.2997 m/s
+  Peak lon deviation : 1.1471 m
+  RMS lon deviation  : 1.1308 m
+  REQ-1 (<0.8m)      : FAIL
+
+TIMING:
+  Control loop       : 0.100 s (10 Hz)
+  Mean exec time     : 0.000729 s (0.729 ms)
+  Max exec time      : 0.004285 s (4.285 ms)
+  Real-time OK       : YES
+
+GENERAL:
+  Loop time          : 119.20 s
+  Goal reached       : 1
+  Termination        : goal_reached
+  Run directory      : /home/yuxuan/Controller_MATLAB_GDP/run/single_run/20260418_015007_mpc_kbm_pid

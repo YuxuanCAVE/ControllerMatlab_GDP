@@ -1,27 +1,20 @@
 function veh = load_vehicle_params(accel_map_file, brake_map_file)
+    % Vehicle parameters retained by the current project:
+    %   - simple longitudinal resistance model
+    %   - vehicle mass
+    %   - wheelbase / axle geometry for kinematic bicycle relations
+    %   - 1D actuator lookup tables for throttle and brake
+
     veh.A = 45;
     veh.B = 10;
     veh.C = 0.518;
     veh.M = 1948;
     veh.L = 2.720;
 
+    % Front / rear axle distances are kept for the standard KBM beta(delta)
+    % relation even though the current plant only uses veh.L directly.
     veh.lf = 1.2140;
     veh.lr = veh.L - veh.lf;
-    veh.Iz = 2500;
-
-    % Simplified Magic Formula tire parameters.
-    % Fy = D * sin(C * atan(B * alpha))
-    veh.tire.front.B = 9.5;
-    veh.tire.front.C = 1.30;
-    veh.tire.front.D = 8000;
-
-    veh.tire.rear.B = 10.5;
-    veh.tire.rear.C = 1.30;
-    veh.tire.rear.D = 8500;
-
-    % Linearized cornering stiffness around small slip angles.
-    veh.tire.front.Calpha = veh.tire.front.B * veh.tire.front.C * veh.tire.front.D;
-    veh.tire.rear.Calpha = veh.tire.rear.B * veh.tire.rear.C * veh.tire.rear.D;
 
     % ── Load actuator maps ────────────────────────────────────────────
     Sacc = load(accel_map_file);
@@ -32,10 +25,6 @@ function veh = load_vehicle_params(accel_map_file, brake_map_file)
     veh.acc.cmd_samples = acc_cmd_raw;
     veh.acc.force_samples = acc_force_raw;
     veh.acc.vel_samples = acc_vel_raw;
-    veh.acc.cmd_min = min(acc_cmd_raw);
-    veh.acc.cmd_max = max(acc_cmd_raw);
-    veh.acc.vel_min = min(acc_vel_raw);
-    veh.acc.vel_max = max(acc_vel_raw);
 
     acc_cmd = acc_cmd_raw;
     acc_force = acc_force_raw;
@@ -47,6 +36,7 @@ function veh = load_vehicle_params(accel_map_file, brake_map_file)
     veh.acc.acc_full = acc_cmd_sorted;
     veh.acc.cmd_full = acc_cmd_sorted;
     veh.acc.force_full = acc_force_sorted;
+    veh.acc.cmd_max = max(acc_cmd_sorted);
 
     Sbrk = load(brake_map_file);
     brk_cmd_raw = make_col(get_first_existing_field(Sbrk, {'Break_Full', 'Brake_Full', 'Brake_full'}));
@@ -60,10 +50,6 @@ function veh = load_vehicle_params(accel_map_file, brake_map_file)
     veh.brk.cmd_samples = brk_cmd_mag;
     veh.brk.force_samples = brk_force_mag;
     veh.brk.vel_samples = brk_vel_mag;
-    veh.brk.cmd_min = min(brk_cmd_mag);
-    veh.brk.cmd_max = max(brk_cmd_mag);
-    veh.brk.vel_min = min(brk_vel_mag);
-    veh.brk.vel_max = max(brk_vel_mag);
 
     [brk_cmd_mag, ib] = unique(brk_cmd_mag, 'stable');
     brk_force_mag = brk_force_mag(ib);
@@ -73,15 +59,19 @@ function veh = load_vehicle_params(accel_map_file, brake_map_file)
     veh.brk.brake_full = brk_cmd_sorted;
     veh.brk.cmd_full = brk_cmd_sorted;
     veh.brk.force_full = brk_force_sorted;
+    veh.brk.cmd_max = max(brk_cmd_sorted);
 
     veh.max_pedal_publish = 0.60;
 
     % Keep the raw map threshold for diagnostics, but use a zero-anchored
     % lookup so small commands/forces are interpolated linearly from zero.
+    acc_cmd_min = min(acc_cmd_raw);
+    brk_cmd_min = min(brk_cmd_mag);
+
     veh.acc.pedal_min_publish_from_map = ...
-        (veh.acc.cmd_min / max(veh.acc.acc_full)) * veh.max_pedal_publish;
+        (acc_cmd_min / max(veh.acc.acc_full)) * veh.max_pedal_publish;
     veh.brk.pedal_min_publish_from_map = ...
-        (veh.brk.cmd_min / max(veh.brk.brake_full)) * veh.max_pedal_publish;
+        (brk_cmd_min / max(veh.brk.brake_full)) * veh.max_pedal_publish;
 
     veh.acc.cmd_min_from_map = ...
         (veh.acc.pedal_min_publish_from_map / veh.max_pedal_publish) * max(veh.acc.acc_full);
@@ -105,6 +95,9 @@ function veh = load_vehicle_params(accel_map_file, brake_map_file)
     [veh.brk.cmd_lookup, veh.brk.force_lookup] = add_zero_anchor( ...
         veh.brk.cmd_full, veh.brk.force_full);
 
+    veh.acc.cmd_max = max(veh.acc.cmd_lookup);
+    veh.brk.cmd_max = max(veh.brk.cmd_lookup);
+
     veh.acc.force_min_effective = 0;
     veh.brk.force_min_effective = 0;
 
@@ -127,18 +120,12 @@ function veh = load_vehicle_params(accel_map_file, brake_map_file)
     % The longitudinal_model.m handles the detailed force balance at each
     % timestep; these limits are for the controller to know its bounds.
 
-    % Max tractive force at 60% pedal
-    max_acc_cmd_60pct = max(veh.acc.acc_full) * veh.max_pedal_publish / ...
-                        (max(veh.acc.acc_full));  % = max * 0.6 / max = 0.6... no
-    % Actually: throttle_pct = (ACC_req / max(acc_full)) * 0.6
-    % So max throttle_pct = 0.6, which maps to ACC_internal = (0.6/0.6)*max(acc_full) = max(acc_full)
-    % Then F_drive_max = interp1(acc_full, force_full, max(acc_full))
+    % Max tractive force at 60% pedal:
+    % the publish cap maps back to the maximum internal command.
     F_trac_max = max(veh.acc.force_full);
 
-    % Max brake force at 60% pedal
-    % brake_pct = (BRK_req / max(brake_full)) * 0.6
-    % Max brake_pct = 0.6, maps to BRK_internal = max(brake_full)
-    % F_brake_max = interp1(brake_full, force_full, max(brake_full))
+    % Max brake force at 60% pedal:
+    % the publish cap maps back to the maximum internal command.
     F_brake_max = max(veh.brk.force_full);
 
     % Resistance at standstill (v=0)

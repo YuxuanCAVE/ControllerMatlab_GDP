@@ -129,7 +129,7 @@ function force = eval_force_map_1d(cmd, map)
         return;
     end
 
-    cmd_q = min(max(cmd, map.cmd_min_effective), map.cmd_max);
+    cmd_q = min(max(cmd, map.cmd_min_effective), get_map_cmd_max(map));
 
     try
         [cmd_axis, force_axis] = get_lookup_axes(map);
@@ -150,7 +150,7 @@ function cmd = invert_force_map_1d(force_target, map)
 
 
     cmd_lo = map.cmd_min_effective;
-    cmd_hi = map.cmd_max;
+    cmd_hi = get_map_cmd_max(map);
 
     try
         [cmd_axis, force_axis] = get_lookup_axes(map);
@@ -183,6 +183,20 @@ function [cmd_axis, force_axis] = get_lookup_axes(map)
     force_axis = map.force_full(idx);
     [cmd_axis, iu] = unique(cmd_axis, 'stable');
     force_axis = force_axis(iu);
+end
+
+function cmd_max = get_map_cmd_max(map)
+    if isfield(map, 'cmd_max') && ~isempty(map.cmd_max)
+        cmd_max = map.cmd_max;
+        return;
+    end
+
+    [cmd_axis, ~] = get_lookup_axes(map);
+    if isempty(cmd_axis)
+        cmd_max = 0;
+    else
+        cmd_max = max(cmd_axis);
+    end
 end
 
 function lon = ensure_actuator_state(lon)
