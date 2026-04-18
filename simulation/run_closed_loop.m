@@ -22,8 +22,6 @@ function result = run_closed_loop(cfg, ref, veh)
 
     switch cfg.controller.longitudinal
         case "pid", lon = cfg.lon_pid;
-        case "lqr", lon = cfg.lon_lqr;
-        case "lqr_force_balance", lon = cfg.lon_lqr_force;
         case "fake_controller", lon = struct();
         otherwise, error('Unknown longitudinal controller: %s', cfg.controller.longitudinal);
     end
@@ -142,10 +140,6 @@ function result = run_closed_loop(cfg, ref, veh)
         switch cfg.controller.longitudinal
             case "pid"
                 [a_des_raw, lon] = PID_controller(v_ref_now, state.v, lon, dt);
-            case "lqr"
-                [a_des_raw, lon] = LQR_controller(v_ref_now, state.v, lon, dt);
-            case "lqr_force_balance"
-                [a_des_raw, lon] = longitudinal_lqr_force_balance_controller(v_ref_now, state.v, lon, dt, veh);
             case "fake_controller"
                 a_des_raw = 0.0;
             otherwise

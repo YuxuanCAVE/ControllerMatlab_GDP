@@ -82,8 +82,6 @@ cfg.lon_pid.kd = 0.0;
 | Item | Type | Notes |
 |---|---|---|
 | `pid` | Controller | PID on speed error, output is net `a_des` |
-| `lqr` | Controller | Longitudinal LQR with anti-chatter shaping |
-| `lqr_force_balance` | Controller | Force-balance LQR |
 | `fake_controller` | Controller | Debug mode for isolating subsystems |
 
 ### Lateral Plant Models
@@ -421,8 +419,6 @@ Controller_GDP/
       stanley_lateral.m
     longitudinal/
       PID_controller.m
-      LQR_controller.m
-      longitudinal_lqr_force_balance_controller.m
 
   model/
     coupled_bicycle_dynamics.m

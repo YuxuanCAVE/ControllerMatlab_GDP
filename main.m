@@ -80,18 +80,10 @@ function save_result_plots(cfg, ref, result, run_dir, ctrl_name)
     log = result.log;
     m = result.metrics;
     dt = cfg.sim.dt;
+    t_end_plot = get_plot_end_time(log, m);
 
     sp_err = log.v_ref - log.v;
     lon_dev = cumsum(sp_err) * dt;
-
-    fig1 = figure('Position', [100 100 800 600], 'Visible', 'off');
-    plot(ref.x, ref.y, 'k--', 'LineWidth', 1.5, 'DisplayName', 'Reference');
-    hold on;
-    plot(log.x, log.y, 'b-', 'LineWidth', 1.2, 'DisplayName', char(ctrl_name));
-    xlabel('X [m]'); ylabel('Y [m]');
-    title(sprintf('Path Tracking (%s)', ctrl_name));
-    legend('Location', 'best'); grid on; axis equal;
-    saveas(fig1, fullfile(run_dir, 'path_tracking.png')); close(fig1);
 
     fig2 = figure('Position', [100 100 1000 700], 'Visible', 'off');
 
@@ -99,24 +91,28 @@ function save_result_plots(cfg, ref, result, run_dir, ctrl_name)
     plot(log.t, log.e_ct, 'b-', 'DisplayName', char(ctrl_name));
     xlabel('Time [s]'); ylabel('CTE [m]');
     title('Lateral Error'); legend; grid on;
+    xlim([0, t_end_plot]);
     ann(gca, sprintf('RMS: %.4f m\nPeak: %.4f m', m.rms_cte, m.peak_cte));
 
     subplot(2,2,2);
     plot(log.t, rad2deg(log.e_psi), 'b-', 'DisplayName', char(ctrl_name));
     xlabel('Time [s]'); ylabel('[deg]');
     title('Heading Error'); legend; grid on;
+    xlim([0, t_end_plot]);
     ann(gca, sprintf('RMS: %.3f deg', m.rms_epsi_deg));
 
     subplot(2,2,3);
     plot(log.t, lon_dev, 'b-', 'DisplayName', char(ctrl_name));
     xlabel('Time [s]'); ylabel('[m]');
     title('Longitudinal Deviation'); legend; grid on;
+    xlim([0, t_end_plot]);
     ann(gca, sprintf('RMS: %.4f m\nPeak: %.4f m', m.rms_lon_dev, m.peak_lon_dev));
 
     subplot(2,2,4);
     plot(log.t, sp_err, 'b-', 'DisplayName', char(ctrl_name));
     xlabel('Time [s]'); ylabel('[m/s]');
     title('Speed Error'); legend; grid on;
+    xlim([0, t_end_plot]);
     ann(gca, sprintf('RMS: %.4f m/s\nPeak: %.4f m/s', m.rms_speed_error, m.peak_speed_error));
 
     sgtitle(sprintf('Tracking Errors (%s)', ctrl_name));
@@ -130,6 +126,7 @@ function save_result_plots(cfg, ref, result, run_dir, ctrl_name)
     plot(log.t, log.v, 'b-', 'LineWidth', 1.2, 'DisplayName', char(ctrl_name));
     xlabel('Time [s]'); ylabel('Speed [m/s]');
     title('Speed Tracking'); legend('Location', 'best'); grid on;
+    xlim([0, t_end_plot]);
 
     subplot(1,2,2);
     plot(log.t, log.ax_cmd, 'b-', 'DisplayName', sprintf('%s Cmd', char(ctrl_name)));
@@ -137,6 +134,7 @@ function save_result_plots(cfg, ref, result, run_dir, ctrl_name)
     plot(log.t, log.ax, 'r-', 'LineWidth', 0.8, 'DisplayName', 'Actual');
     xlabel('Time [s]'); ylabel('[m/s^2]');
     title('Acceleration'); legend; grid on;
+    xlim([0, t_end_plot]);
 
     sgtitle(sprintf('Longitudinal (%s)', ctrl_name));
     saveas(fig3, fullfile(run_dir, 'speed_tracking.png')); close(fig3);
@@ -149,6 +147,7 @@ function save_result_plots(cfg, ref, result, run_dir, ctrl_name)
     plot(log.t, rad2deg(log.delta_cmd_exec), 'r-', 'DisplayName', 'Executed');
     xlabel('Time [s]'); ylabel('[deg]');
     title('Steering Angle'); legend; grid on;
+    xlim([0, t_end_plot]);
 
     subplot(1,2,2);
     plot(log.t, log.vy, 'b-', 'DisplayName', 'v_y [m/s]');
@@ -156,6 +155,7 @@ function save_result_plots(cfg, ref, result, run_dir, ctrl_name)
     plot(log.t, log.r, 'r-', 'DisplayName', 'r [rad/s]');
     xlabel('Time [s]');
     title('Lateral States'); legend; grid on;
+    xlim([0, t_end_plot]);
 
     sgtitle(sprintf('Lateral Dynamics (%s)', ctrl_name));
     saveas(fig4, fullfile(run_dir, 'lateral_dynamics.png')); close(fig4);
@@ -169,6 +169,7 @@ function save_result_plots(cfg, ref, result, run_dir, ctrl_name)
     title(sprintf('Controller Execution Time (%s) - mean %.3f ms, max %.3f ms', ...
         ctrl_name, m.ctrl_exec_mean_s*1000, m.ctrl_exec_max_s*1000));
     legend('Location', 'best'); grid on;
+    xlim([0, t_end_plot]);
     saveas(fig5, fullfile(run_dir, 'execution_timing.png')); close(fig5);
 
     fig6 = figure('Position', [100 100 1200 900], 'Visible', 'off');
@@ -181,6 +182,7 @@ function save_result_plots(cfg, ref, result, run_dir, ctrl_name)
     xlabel('Time [s]'); ylabel('[N]');
     title('Force Balance Internals');
     legend('Location', 'best'); grid on;
+    xlim([0, t_end_plot]);
 
     subplot(4,1,2);
     plot(log.t, log.throttle, 'g-', 'LineWidth', 1.1, 'DisplayName', 'throttle\_pct');
@@ -189,6 +191,7 @@ function save_result_plots(cfg, ref, result, run_dir, ctrl_name)
     xlabel('Time [s]'); ylabel('[0-1]');
     title('Pedal Commands');
     legend('Location', 'best'); grid on;
+    xlim([0, t_end_plot]);
 
     subplot(4,1,3);
     plot(log.t, log.ACC_req, 'g-', 'LineWidth', 1.1, 'DisplayName', 'ACC\_req');
@@ -197,6 +200,7 @@ function save_result_plots(cfg, ref, result, run_dir, ctrl_name)
     xlabel('Time [s]'); ylabel('Map cmd');
     title('Lookup Requests');
     legend('Location', 'best'); grid on;
+    xlim([0, t_end_plot]);
 
     subplot(4,1,4);
     stairs(log.t, log.branch_mode, 'k-', 'LineWidth', 1.2, 'DisplayName', 'branch\_mode');
@@ -211,11 +215,131 @@ function save_result_plots(cfg, ref, result, run_dir, ctrl_name)
     xlabel('Time [s]'); ylabel('Branch');
     title('Actuator Branch Selection');
     legend('Location', 'best'); grid on;
+    xlim([0, t_end_plot]);
 
     sgtitle(sprintf('Longitudinal Internal Diagnostics (%s)', ctrl_name));
     saveas(fig6, fullfile(run_dir, 'longitudinal_internal_diagnostics.png')); close(fig6);
 
+    save_poster_overview_plot(ref, log, run_dir, ctrl_name, t_end_plot);
     save_sim_vs_bag_plot(log, run_dir, fullfile('data', 'bag_data_10hz.mat'), ctrl_name);
+end
+
+function save_poster_overview_plot(ref, log, run_dir, ctrl_name, t_end_plot)
+    c_ref = [0.08, 0.08, 0.08];
+    c_path = [0.00, 0.36, 0.84];
+    c_speed = [0.95, 0.45, 0.10];
+    c_throttle = [0.03, 0.55, 0.24];
+    c_brake = [0.78, 0.16, 0.18];
+    c_delta_cmd = [0.31, 0.20, 0.60];
+    grid_c = [0.88, 0.89, 0.91];
+
+    fig = figure('Position', [80 80 1400 900], 'Visible', 'off', 'Color', 'w');
+    tl = tiledlayout(fig, 2, 2, 'TileSpacing', 'compact', 'Padding', 'compact');
+
+    ax1 = nexttile(tl, 1);
+
+    hold(ax1, 'on');
+
+    plot(ax1, ref.x, ref.y, '--', 'Color', c_ref, 'LineWidth', 2.2, ...
+        'DisplayName', 'Reference');
+    plot(ax1, log.x, log.y, '-', 'Color', c_path, 'LineWidth', 2.8, ...
+        'DisplayName', 'NMPC + PID');
+    plot(ax1, log.x(1), log.y(1), 'o', 'MarkerSize', 6, ...
+        'MarkerFaceColor', [0.00, 0.65, 0.20], ...
+        'MarkerEdgeColor', [0.00, 0.45, 0.15], ...
+        'LineWidth', 0.8, ...
+        'DisplayName', 'Start');
+    plot(ax1, log.x(end), log.y(end), 'o', 'MarkerSize', 6, ...
+        'MarkerFaceColor', [0.82, 0.14, 0.16], ...
+        'MarkerEdgeColor', [0.60, 0.08, 0.10], ...
+        'LineWidth', 0.8, ...
+        'DisplayName', 'End');
+
+    % plot(ax1, ref.x(1), ref.y(1), 'o', 'MarkerSize', 7, 'MarkerFaceColor', c_ref, ...
+    %     'MarkerEdgeColor', c_ref, 'HandleVisibility', 'off');
+    % plot(ax1, ref.x(end), ref.y(end), 's', 'MarkerSize', 7, 'MarkerFaceColor', c_path, ...
+    %     'MarkerEdgeColor', c_path, 'HandleVisibility', 'off');
+
+    axis(ax1, 'equal');
+    grid(ax1, 'on');
+    box(ax1, 'on');
+    ax1.GridColor = grid_c;
+    ax1.GridAlpha = 0.9;
+    ax1.FontSize = 12;
+    xlabel(ax1, 'X [m]', 'FontWeight', 'bold');
+    ylabel(ax1, 'Y [m]', 'FontWeight', 'bold');
+    title(ax1, 'Path Tracking', 'FontWeight', 'bold', 'FontSize', 16);
+    legend(ax1, 'Location', 'best', 'Box', 'off', 'FontSize', 11);
+
+    ax2 = nexttile(tl, 2);
+    plot(ax2, log.t, log.v_ref, '--', 'Color', c_ref, 'LineWidth', 2.0, ...
+        'DisplayName', 'Reference speed');
+    hold(ax2, 'on');
+    plot(ax2, log.t, log.v, '-', 'Color', c_speed, 'LineWidth', 2.8, ...
+        'DisplayName', 'Vehicle speed');
+    grid(ax2, 'on');
+    box(ax2, 'on');
+    ax2.GridColor = grid_c;
+    ax2.GridAlpha = 0.9;
+    ax2.FontSize = 12;
+    xlabel(ax2, 'Time [s]', 'FontWeight', 'bold');
+    ylabel(ax2, 'Speed [m/s]', 'FontWeight', 'bold');
+    title(ax2, 'Speed Tracking', 'FontWeight', 'bold', 'FontSize', 16);
+    legend(ax2, 'Location', 'best', 'Box', 'off', 'FontSize', 11);
+    xlim(ax2, [0, t_end_plot]);
+
+    ax3 = nexttile(tl, 3);
+    plot(ax3, log.t, 100 * log.throttle, '-', 'Color', c_throttle, 'LineWidth', 2.6, ...
+        'DisplayName', 'Throttle');
+    hold(ax3, 'on');
+    plot(ax3, log.t, 100 * log.brake, '-', 'Color', c_brake, 'LineWidth', 2.6, ...
+        'DisplayName', 'Brake');
+    ylim(ax3, [0, max(5, 1.08 * max([100 * log.throttle; 100 * log.brake; 1]))]);
+    grid(ax3, 'on');
+    box(ax3, 'on');
+    ax3.GridColor = grid_c;
+    ax3.GridAlpha = 0.9;
+    ax3.FontSize = 12;
+    xlabel(ax3, 'Time [s]', 'FontWeight', 'bold');
+    ylabel(ax3, 'Pedal Command [%]', 'FontWeight', 'bold');
+    title(ax3, 'Throttle / Brake Command', 'FontWeight', 'bold', 'FontSize', 16);
+    legend(ax3, 'Location', 'best', 'Box', 'off', 'FontSize', 11);
+    xlim(ax3, [0, t_end_plot]);
+
+    ax4 = nexttile(tl, 4);
+    plot(ax4, log.t, rad2deg(log.delta_cmd_raw), '-', 'Color', c_delta_cmd, 'LineWidth', 2.2, ...
+        'DisplayName', 'Steering cmd');
+    yline(ax4, 0, ':', 'Color', [0.45 0.45 0.45], 'LineWidth', 1.0, 'HandleVisibility', 'off');
+    grid(ax4, 'on');
+    box(ax4, 'on');
+    ax4.GridColor = grid_c;
+    ax4.GridAlpha = 0.9;
+    ax4.FontSize = 12;
+    xlabel(ax4, 'Time [s]', 'FontWeight', 'bold');
+    ylabel(ax4, 'Steering [deg]', 'FontWeight', 'bold');
+    title(ax4, 'Steering Command', 'FontWeight', 'bold', 'FontSize', 16);
+    legend(ax4, 'Location', 'best', 'Box', 'off', 'FontSize', 11);
+    xlim(ax4, [0, t_end_plot]);
+
+    title(tl, sprintf('Controller Overview'), ...
+        'FontWeight', 'bold', 'FontSize', 20);
+
+    exportgraphics(fig, fullfile(run_dir, 'poster_overview.png'), 'Resolution', 220);
+    close(fig);
+end
+
+function t_end_plot = get_plot_end_time(log, m)
+    t_end_plot = 0.0;
+
+    if isfield(log, 't') && ~isempty(log.t)
+        t_end_plot = log.t(end);
+    end
+
+    if isfield(m, 'single_loop_time_s') && ~isempty(m.single_loop_time_s)
+        t_end_plot = min(max(t_end_plot, 1e-6), m.single_loop_time_s);
+    else
+        t_end_plot = max(t_end_plot, 1e-6);
+    end
 end
 
 function write_summary_file(result, run_dir, ctrl_name)

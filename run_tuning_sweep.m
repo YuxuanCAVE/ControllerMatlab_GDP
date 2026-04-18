@@ -29,12 +29,9 @@ function run_tuning_sweep(dry_run)
     a_max_map = veh.a_max_from_map;
     a_min_map = veh.a_min_from_map;
     cfg_base.lon_pid.a_max = a_max_map; cfg_base.lon_pid.a_min = a_min_map;
-    cfg_base.lon_lqr.a_max = a_max_map; cfg_base.lon_lqr.a_min = a_min_map;
 
     combos = {
         struct('lateral',"mpc_kinematic",'lon',"pid",'label',"mpc_kinematic+pid");
-        struct('lateral',"mpc_kinematic",'lon',"lqr",'label',"mpc_kinematic+lqr");
-        struct('lateral',"mpc_kinematic",'lon',"lqr_force_balance",'label',"mpc_kinematic+lqr_force");
     };
 
     speed_conditions = {};
