@@ -3,6 +3,10 @@ function delta_cmd = mpc_kbm_lateral(state, ref, veh, dt, p, idx_hint, window, s
 % Linear MPC based on a time-varying linearisation of the full nonlinear
 % kinematic bicycle model (KBM).
 %
+% Steering command convention:
+%   left turn  -> negative delta command
+%   right turn -> positive delta command
+%
 % State:
 %   x_k = [X_k; Y_k; psi_k; delta_k]
 %
@@ -15,7 +19,7 @@ function delta_cmd = mpc_kbm_lateral(state, ref, veh, dt, p, idx_hint, window, s
 %   psi_dot   = v / l_r * sin(beta(delta))
 %   delta_dot = u
 %
-%   beta(delta) = atan((l_r / L) * tan(delta))
+%   beta(delta_cmd) = -atan((l_r / L) * tan(delta_cmd))
 %
 % This controller keeps the MPC formulation linear by:
 %   1) building a nominal trajectory with the full nonlinear KBM
@@ -359,8 +363,8 @@ function [Aineq, bineq] = build_state_constraints(Sx, Su, x0, Sc, nominal, previ
             delta_bar = nominal.x(4, k);
             v_bar = preview.v(k);
 
-            ay_bar = v_bar^2 / max(L, 1e-6) * tan(delta_bar);
-            day_ddelta = v_bar^2 / max(L, 1e-6) * sec(delta_bar)^2;
+            ay_bar = -v_bar^2 / max(L, 1e-6) * tan(delta_bar);
+            day_ddelta = -v_bar^2 / max(L, 1e-6) * sec(delta_bar)^2;
 
             A_ay(k, :) = day_ddelta * Su(row, :);
 
@@ -402,13 +406,13 @@ function x_next = nonlinear_kbm_step(xk, delta_cmd, v_k, veh, Ts)
 end
 
 function beta = kbm_beta(delta_cmd, lr, L)
-    beta = atan((lr / max(L, 1e-6)) * tan(delta_cmd));
+    beta = -atan((lr / max(L, 1e-6)) * tan(delta_cmd));
 end
 
 function dbeta = kbm_beta_derivative(delta_cmd, alpha)
     tan_delta = tan(delta_cmd);
     sec_delta_sq = sec(delta_cmd)^2;
-    dbeta = alpha * sec_delta_sq / (1 + (alpha * tan_delta)^2);
+    dbeta = -alpha * sec_delta_sq / (1 + (alpha * tan_delta)^2);
 end
 
 function v = get_speed(state)

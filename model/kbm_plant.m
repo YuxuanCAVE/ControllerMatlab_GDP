@@ -1,5 +1,9 @@
 % Main lateral plant used by the project.
-% Standard kinematic bicycle model (KBM) at the vehicle CG:
+% Standard kinematic bicycle model (KBM) at the vehicle CG.
+%
+% Steering command convention in this project:
+%   left turn  -> negative delta_cmd
+%   right turn -> positive delta_cmd
 %
 %   X_dot   = V * cos(psi + beta(delta))
 %   Y_dot   = V * sin(psi + beta(delta))
@@ -57,7 +61,10 @@ function [state, ax, lat] = kbm_plant(state, delta_cmd, lon_model, dt, veh)
 end
 
 function beta = kbm_beta(delta_cmd, lr, L)
-    beta = atan((lr / max(L, 1e-6)) * tan(delta_cmd));
+    % The KBM itself uses the standard mathematical steering sign
+    % (left-positive). Convert from the project command convention
+    % (left-negative, right-positive) here.
+    beta = -atan((lr / max(L, 1e-6)) * tan(delta_cmd));
 end
 
 function v = get_speed(state)

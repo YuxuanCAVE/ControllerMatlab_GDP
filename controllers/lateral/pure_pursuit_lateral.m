@@ -29,5 +29,7 @@ function delta = pure_pursuit_lateral(x, y, yaw, v, ref, L, p, idx_hint, window)
     delta_pp = atan2(2 * L * sin(alpha), max(Ld, 1e-3));
     delta_ff = p.delta_ff_gain * atan(L * ref.kappa(idx));
 
-    delta = p.k_pp * delta_pp + delta_ff;
+    % Convert from the standard left-positive steering solution to the
+    % project command convention: left-negative, right-positive.
+    delta = -(p.k_pp * delta_pp + delta_ff);
 end

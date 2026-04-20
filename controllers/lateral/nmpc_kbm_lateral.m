@@ -1,6 +1,10 @@
 function [delta_cmd, nmpc] = nmpc_kbm_lateral(state, ref, veh, dt, p, idx_hint, window)
 % NMPC_KBM_LATERAL  Lateral NMPC using a nonlinear kinematic bicycle model.
 %
+% Steering command convention:
+%   left turn  -> negative delta command
+%   right turn -> positive delta command
+%
 % State:
 %   x_k = [X_k; Y_k; psi_k]
 %
@@ -12,7 +16,7 @@ function [delta_cmd, nmpc] = nmpc_kbm_lateral(state, ref, veh, dt, p, idx_hint, 
 %   Y_{k+1}   = Y_k + Ts * v_k * sin(psi_k + beta(delta_k))
 %   psi_{k+1} = psi_k + Ts * v_k / l_r * sin(beta(delta_k))
 %
-%   beta(delta) = atan((l_r / L) * tan(delta))
+%   beta(delta_cmd) = -atan((l_r / L) * tan(delta_cmd))
 %
 % Cost:
 %   sum_{k=0}^{N-1} q_X e_X^2 + q_Y e_Y^2 + q_psi e_psi^2
@@ -241,14 +245,18 @@ function [x_pred, ay_pred] = predict_kbm_trajectory(x0, U, v_known, veh, Ts)
         v_k = v_known(k);
         delta_k = U(k);
 
-        beta_k = atan((lr / max(L, 1e-6)) * tan(delta_k));
+        beta_k = kbm_beta_from_command(delta_k, lr, L);
 
         x_pred(1, k + 1) = X_k + Ts * v_k * cos(psi_k + beta_k);
         x_pred(2, k + 1) = Y_k + Ts * v_k * sin(psi_k + beta_k);
         x_pred(3, k + 1) = angle_wrap(psi_k + Ts * (v_k / max(lr, 1e-6)) * sin(beta_k));
 
-        ay_pred(k) = v_k^2 / max(L, 1e-6) * tan(delta_k);
+        ay_pred(k) = -v_k^2 / max(L, 1e-6) * tan(delta_k);
     end
+end
+
+function beta = kbm_beta_from_command(delta_cmd, lr, L)
+    beta = -atan((lr / max(L, 1e-6)) * tan(delta_cmd));
 end
 
 function u_init = build_initial_guess(problem)

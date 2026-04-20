@@ -20,12 +20,12 @@ function cfg = default_config()
     cfg.init.anchor_mode = "index";               % "index"
     cfg.init.path_index = 20;
     cfg.init.ex0_m = 0.0;                         % tangent offset [m]
-    cfg.init.ey0_m = -10.0;                         % normal offset [m]
+    cfg.init.ey0_m = -5.0;                         % normal offset [m]
     cfg.init.yaw_offset_deg = 0.0;
     cfg.init.v0_mps = 0;
 
-    cfg.speed.mode = "profile";                  % "constant" | "profile"
-    cfg.speed.constant_value = 3;                 % used when mode = "constant" (m/s)
+    cfg.speed.mode = "constant";                  % "constant" | "profile"
+    cfg.speed.constant_value = 2;                 % used when mode = "constant" (m/s)
     cfg.speed.profile_file = fullfile( ...
         'data', 'reference_velocity', 'referencePath_Velocity_peak_velocity_3.mat');
 

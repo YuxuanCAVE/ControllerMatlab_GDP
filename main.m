@@ -12,6 +12,7 @@ addpath(fullfile(project_root, 'simulation'));
 addpath(fullfile(project_root, 'plotting'));
 addpath(fullfile(project_root, 'utils'));
 
+
 cfg = default_config();
 ref = load_reference_path(cfg.ref.path_file);
 ref = load_reference_speed(ref, cfg.speed);
@@ -139,6 +140,8 @@ function save_result_plots(cfg, ref, result, run_dir, ctrl_name)
     sgtitle(sprintf('Longitudinal (%s)', ctrl_name));
     saveas(fig3, fullfile(run_dir, 'speed_tracking.png')); close(fig3);
 
+    
+
     fig4 = figure('Position', [100 100 1000 500], 'Visible', 'off');
 
     subplot(1,2,1);
@@ -219,6 +222,16 @@ function save_result_plots(cfg, ref, result, run_dir, ctrl_name)
 
     sgtitle(sprintf('Longitudinal Internal Diagnostics (%s)', ctrl_name));
     saveas(fig6, fullfile(run_dir, 'longitudinal_internal_diagnostics.png')); close(fig6);
+
+    fig7 = figure('Position', [100 100 1200 900], 'Visible', 'off');
+    plot(log.t, log.v_ref, 'k--', 'LineWidth', 1.5, 'DisplayName', 'Reference');
+    hold on;
+    plot(log.t, log.v, 'b-', 'LineWidth', 1.2, 'DisplayName', char(ctrl_name));
+    xlabel('Time [s]'); ylabel('Speed [m/s]');
+    title('Speed Tracking'); legend('Location', 'best'); grid on;
+    xlim([0, t_end_plot]);
+    saveas(fig7, fullfile(run_dir, 'onlyspeed.png')); close(fig7);
+
 
     save_poster_overview_plot(ref, log, run_dir, ctrl_name, t_end_plot);
     save_sim_vs_bag_plot(log, run_dir, fullfile('data', 'bag_data_10hz.mat'), ctrl_name);

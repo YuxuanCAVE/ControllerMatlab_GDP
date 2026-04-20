@@ -15,5 +15,7 @@ function delta = stanley_lateral(x, y, yaw, v, ref, L, p, idx_hint, window)
     delta_ff = p.delta_ff_gain * atan(L * kappa);
     delta_fb = p.k_yaw * e_psi + atan2(p.k_cte * e_ct, p.k_soft + max(v, 0.5));
 
-    delta = delta_ff + delta_fb;
+    % Convert from the standard left-positive steering solution to the
+    % project command convention: left-negative, right-positive.
+    delta = -(delta_ff + delta_fb);
 end
